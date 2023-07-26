@@ -1,0 +1,8 @@
+拉取镜像：
+docker pull registry.cn-hangzhou.aliyuncs.com/trt-hackathon/trt-hackathon:wsl
+首次运行：
+docker run --gpus all --name trt2023  -it --rm --ipc=host  --ulimit memlock=-1  --ulimit stack=67108864  registry.cn-hangzhou.aliyuncs.com/trt-hackathon/trt-hackathon:wsl
+使用本地GPU：
+docker run --gpus all --name trt2023  -u root  -d   --ipc=host   --ulimit memlock=-1  --restart=always   --ulimit stack=67108864   -v ${PWD}:/home/player/ControlNet/   registry.cn-hangzhou.aliyuncs.com/trt-hackathon/trt-hackathon:wsl sleep 8640000  
+测评代码，生成图片:
+python3 compute_score.py
