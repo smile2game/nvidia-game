@@ -3,4 +3,5 @@
 *.so
 *.pth
 *.onnx
+*.engine
 trt-samples-for-hackathon-cn/

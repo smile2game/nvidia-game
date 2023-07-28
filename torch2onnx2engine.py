@@ -19,8 +19,8 @@ import tensorrt as trt
 class hackathon():
     def initialize(self):
         self.apply_canny = CannyDetector()
-        self.model = create_model('./models/cldm_v15.yaml').cpu()#创建模型
-        self.model.load_state_dict(load_state_dict('./models/control_sd15_canny.pth', location='cuda'))
+        self.model = create_model('/home/player/ControlNet/models/cldm_v15.yaml').cpu()#创建模型
+        self.model.load_state_dict(load_state_dict('/home/player/ControlNet/models/control_sd15_canny.pth', location='cuda'))
         self.model = self.model.cuda()
         self.ddim_sampler = DDIMSampler(self.model)
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
@@ -66,12 +66,9 @@ class hackathon():
                 #                 output_names=output_names, 
                 #                 dynamic_axes=dynamic_axes,
                 #                 opset_version=17)
-                
-
-
                 # print("成功导出onnx模型")
             elif k == "control_net":
-                if not os.path.isfile("./models/onnxmodels/sd_control_test.onnx"):
+                if not os.path.isfile("./sd_control_test.onnx"):
                     print("开始导出control_net的onnx模型")
                     control_model = self.model.control_model  #获取control_model
                     x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda") #获取输入尺寸
@@ -90,7 +87,7 @@ class hackathon():
                         dynamic_table[output_names[i]] = {0 : "bs"}
                     torch.onnx.export(control_model,
                                     (x_in,h_in,t_in,c_in),
-                                    "./models/onnxmodels/sd_control_test.onnx",
+                                    "./sd_control_test.onnx",
                                     export_params=True,
                                     opset_version=17,
                                     do_constant_folding=True,
@@ -99,13 +96,14 @@ class hackathon():
                                     output_names=output_names,
                                     dynamic_axes=dynamic_table)
                     print("成功导出control_net的onnx模型")
+
                 if not os.path.isfile("sd_control_fp16.engine"):
                     print("开始导出control_net的engine模型")
-                    os.system("trtexec --onnx=./models/onnxmodels/sd_control_test.onnx --saveEngine=./models/enginemodels/sd_control_fp16.engine --fp16 --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768")
+                    os.system("trtexec --onnx=./sd_control_test.onnx --saveEngine=./sd_control_fp16.engine --fp16 --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768")
                     print("成功导出control_net的engine模型")
                 with open("./sd_control_fp16.engine", 'rb') as f:
                     engine_str = f.read()
-
+                
                 control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
                 control_context = control_engine.create_execution_context()
 
