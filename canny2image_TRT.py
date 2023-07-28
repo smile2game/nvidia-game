@@ -21,11 +21,11 @@ class hackathon():
 
     def initialize(self):
         self.apply_canny = CannyDetector()
-        self.model = create_model('/home/player/ControlNet/models/cldm_v15.yaml').cpu()
+        self.model = create_model('./models/cldm_v15.yaml').cpu()
         self.model.load_state_dict(load_state_dict('/home/player/ControlNet/models/control_sd15_canny.pth', location='cuda'))
         self.model = self.model.cuda()
         self.ddim_sampler = DDIMSampler(self.model)
-
+        """-----------------------------------------------"""
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
         H = 256
@@ -67,7 +67,7 @@ class hackathon():
         control_context.set_binding_shape(3, (1, 77, 768))
         self.model.control_context = control_context
         print("finished")
-
+        """-----------------------------------------------"""
 
     def process(self, input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, low_threshold, high_threshold):
         with torch.no_grad():
