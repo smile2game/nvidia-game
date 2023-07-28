@@ -1,0 +1,2 @@
+import onnxruntime
+print(onnxruntime.__version__)

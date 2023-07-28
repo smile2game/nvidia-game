@@ -1,3 +1,6 @@
 # .gitignore
+*.plan
+*.so
 *.pth
+*.onnx
 trt-samples-for-hackathon-cn/
