@@ -57,15 +57,16 @@ class hackathon():
                                 input_names = ['x_in', "h_in", "t_in", "c_in"], 
                                 output_names = output_names)
                                 # dynamic_axes = dynamic_table)
-            os.system("trtexec --onnx=sd_control_test.onnx --saveEngine=sd_control_fp16.engine --fp16 --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768")
+            os.system("trtexec --onnx=sd_control_test.onnx --saveEngine=sd_control_fp16.engine --fp16")
+            # --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768
         with open("./sd_control_fp16.engine", 'rb') as f:
             engine_str = f.read()
         control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
         control_context = control_engine.create_execution_context()
-        # control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-        # control_context.set_binding_shape(1, (1, 3, H, W))
-        # control_context.set_binding_shape(2, (1,))
-        # control_context.set_binding_shape(3, (1, 77, 768))
+        control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
+        control_context.set_binding_shape(1, (1, 3, H, W))
+        control_context.set_binding_shape(2, (1,))
+        control_context.set_binding_shape(3, (1, 77, 768))
         self.model.control_context = control_context
         print("controlnet成功转为engine模型")
         """-----------------------------------------------"""

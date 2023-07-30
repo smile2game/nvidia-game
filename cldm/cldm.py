@@ -333,8 +333,17 @@ class ControlLDM(LatentDiffusion):
         cond_txt = torch.cat(cond['c_crossattn'], 1)
 
         if cond['c_concat'] is None:
-            eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=None, only_mid_control=self.only_mid_control)
 
+            #eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=None, only_mid_control=self.only_mid_control)
+            ################################# update: diffusion trt infer ########################################
+            buffer_device = []
+            buffer_device.append(x_noisy.reshape(-1).data_ptr())
+            buffer_device.append(t.reshape(-1).data_ptr())
+            buffer_device.append(cond_txt.reshape(-1).data_ptr())
+            eps = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to("cuda")
+            buffer_device.append(eps.reshape(-1).data_ptr())
+            self.diffusion_context.execute_v2(buffer_device)
+            ######################################################################################################
         else:
             """这里参考 代码 更改"""
             # control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_txt)
@@ -385,7 +394,15 @@ class ControlLDM(LatentDiffusion):
 
 
 
-            eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
+            # eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
+            ################################# update: diffusion trt infer ########################################
+            del buffer_device[1]
+            for temp in control:
+                buffer_device.append(temp.reshape(-1).data_ptr())
+            eps = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to("cuda")
+            buffer_device.append(eps.reshape(-1).data_ptr())
+            self.diffusion_context.execute_v2(buffer_device)
+            ######################################################################################################
 
         return eps
 
