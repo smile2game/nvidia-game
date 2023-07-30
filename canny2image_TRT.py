@@ -60,10 +60,6 @@ class hackathon():
             engine_str = f.read()
         control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
         control_context = control_engine.create_execution_context()
-        # control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-        # control_context.set_binding_shape(1, (1, 3, H, W))
-        # control_context.set_binding_shape(2, (1,))
-        # control_context.set_binding_shape(3, (1, 77, 768))
         self.model.control_context = control_context
         print("finished")
         """-----------------------------------------------"""
@@ -71,6 +67,7 @@ class hackathon():
         """-----------------------------------------------转换diffusion_model为engine-----------------------------------------------"""
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
+
         with open("./sd_diffusion_fp16.engine", 'rb') as f:
             diffusion_engine_str = f.read()
         diffusion_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(diffusion_engine_str)
