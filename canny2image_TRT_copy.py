@@ -62,7 +62,6 @@ class hackathon():
                                 input_names = ['x_in', "h_in", "t_in", "c_in"], 
                                 output_names = output_names, 
                                 dynamic_axes = dynamic_table)
-            
             os.system("trtexec --onnx=sd_control_test.onnx --saveEngine=sd_control_fp16.engine --fp16 --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768")
         
         with open("./sd_control_fp16.engine", 'rb') as f:
@@ -81,7 +80,7 @@ class hackathon():
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
         diffusion_model = self.model.model.diffusion_model #找对了
-        if not os.path.isfile("sd_diffusion_fp16.engine"):
+        if not os.path.isfile("sd_diffusion_single_fp16.engine"):
             x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
             time_in = torch.zeros(1, dtype=torch.int64).to("cuda")
             context_in = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
@@ -103,34 +102,33 @@ class hackathon():
             #print("diffusion_model的输出为:",diffusion_test.shape)
             input_names = ["x_in", "time_in", "context_in","crotrol"]
             output_names = ["out_h"]
-            dynamic_table = {"x_in" : {0 : "bs", 2 : "H", 3 : "W"},
-                             "time_in" : {0 : "bs"},
-                             "context_in" : {0 : "bs"},
-                            }
+            # dynamic_table = {"x_in" : {0 : "bs", 2 : "H", 3 : "W"},
+            #                  "time_in" : {0 : "bs"},
+            #                  "context_in" : {0 : "bs"},
+            #                 }
             print("开始转换diffusion_model为onnx！\n")
             torch.onnx.export(diffusion_model,               
                                 (x_in, time_in, context_in, control),  
-                                "./sd_diffusion_fp16.onnx",   
-                                export_params=False,#
+                                "./sd_diffusion_single_fp16.onnx",   
+                                export_params=True,#
                                 opset_version=16,
                                 do_constant_folding=True,
                                 keep_initializers_as_inputs=True,
                                 input_names =input_names, 
-                                output_names = output_names, 
-                                dynamic_axes = dynamic_table)
+                                output_names = output_names)
             print("diffusion_model转换为onnx成功！\n")
 
-            print("开始转换diffusion_model为engine！\n")
-            #os.system("trtexec --onnx=sd_diffusion_fp16.onnx --saveEngine=sd_diffusion_fp16.engine --fp16")
-            print("转换diffusion_model为engine成功！\n")
-        print("开始加载diffusion_model的engine！\n")
-        with open("./sd_diffusion_fp16.engine", 'rb') as f:
-            engine_str = f.read()
-        diffusion_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-        diffusion_context = diffusion_engine.create_execution_context()
-        diffusion_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-        diffusion_context.set_binding_shape(1, (1,))
-        diffusion_context.set_binding_shape(2, (1, 77, 768))
+            # print("开始转换diffusion_model为engine！\n")
+            # #os.system("trtexec --onnx=sd_diffusion_fp16.onnx --saveEngine=sd_diffusion_fp16.engine --fp16")
+            # print("转换diffusion_model为engine成功！\n")
+        # print("开始加载diffusion_model的engine！\n")
+        # with open("./sd_diffusion_fp16.engine", 'rb') as f:
+        #     engine_str = f.read()
+        # diffusion_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+        # diffusion_context = diffusion_engine.create_execution_context()
+        # diffusion_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
+        # diffusion_context.set_binding_shape(1, (1,))
+        # diffusion_context.set_binding_shape(2, (1, 77, 768))
         # diffusion_context.set_binding_shape(4, (1, 320, H//8, W //8))
         # diffusion_context.set_binding_shape(5,( 1, 320, H//8, W //8))
         # diffusion_context.set_binding_shape(6, (1, 320, H//8, W //8))
@@ -144,7 +142,7 @@ class hackathon():
         # diffusion_context.set_binding_shape(14, (1, 1280, H//64, W //64))
         # diffusion_context.set_binding_shape(15, (1, 1280, H//64, W //64))
         # diffusion_context.set_binding_shape(16, (1, 1280, H//64, W //64))
-        self.model.diffusion_context = diffusion_context
+        #self.model.diffusion_context = diffusion_context
         print("加载diffusion_model的engine成功！\n")
         """-----------------------------------------------"""
 
