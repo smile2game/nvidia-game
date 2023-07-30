@@ -20,6 +20,7 @@ from ldm.models.diffusion.ddim import DDIMSampler
 
 
 class ControlledUnetModel(UNetModel):
+    # def forward(self, x, timesteps=None, context=None, control=None, only_mid_control=False, **kwargs):
     def forward(self, x, timesteps=None, context=None, control=None, only_mid_control=False, **kwargs):
         hs = []
         with torch.no_grad():
@@ -306,7 +307,6 @@ class ControlNet(nn.Module):
 
 
 class ControlLDM(LatentDiffusion):
-
     def __init__(self, control_stage_config, control_key, only_mid_control, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.control_model = instantiate_from_config(control_stage_config)
@@ -333,6 +333,7 @@ class ControlLDM(LatentDiffusion):
 
         if cond['c_concat'] is None:
             eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=None, only_mid_control=self.only_mid_control)
+
         else:
             """这里参考 代码 更改"""
             # control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_txt)

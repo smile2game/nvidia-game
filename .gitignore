@@ -1,7 +1,10 @@
 # .gitignore
-*.plan
-*.so
-*.pth
-*.onnx
-*.engine
+*.plan*
+*.so*
+*.pth*
+*.onnx*
+*.engine*
+*.weight*
+*.bias*
+*onnx*
 trt-samples-for-hackathon-cn/

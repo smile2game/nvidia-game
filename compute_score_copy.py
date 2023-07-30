@@ -3,7 +3,7 @@ from pytorch_fid import fid_score
 from pytorch_fid.inception import InceptionV3
 import cv2
 import datetime
-from canny2image_TRT import hackathon
+from canny2image_TRT_copy import hackathon
 
 block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
 model = InceptionV3([block_idx]).to("cuda")
@@ -20,26 +20,26 @@ scores = []
 latencys = []
 hk = hackathon()
 hk.initialize()
-for i in range(20):
+for i in range(1):
     path = "/home/player/pictures_croped/bird_"+ str(i) + ".jpg"
     img = cv2.imread(path)
     start = datetime.datetime.now().timestamp()
     new_img = hk.process(img,
             "a bird", 
             "best quality, extremely detailed", 
-            "longbody, lowres, bad anatomy, bad hands, missing fingers",  #
-            1, #num_samples生成样本数量
-            256, #image_resolution：图像的分辨率。
-            20, #ddim_steps：DDIM采样的步数。
-            False,  #guess_mode：一个布尔值，表示是否使用猜测模式。
-            1, #strength：控制信号的强度。
-            9, #scale：无条件控制信号的比例。
-            2946901, #seed：随机数种子。
-            0.0,  #eta：DDIM采样的步长。
-            100, #low_threshold：Canny边缘检测的低阈值。
-            200) #high_threshold：Canny边缘检测的高阈值。
+            "longbody, lowres, bad anatomy, bad hands, missing fingers", 
+            1, #
+            256, 
+            20,
+            False, 
+            1, 
+            9, 
+            2946901, 
+            0.0, 
+            100, 
+            200)
     end = datetime.datetime.now().timestamp()
-    print("time cost is: ", (end-start)*1000)
+    print("time cost is: \n身心愉悦！！\n", (end-start)*1000)
     new_path = "./bird_"+ str(i) + ".jpg"
     cv2.imwrite(new_path, new_img[0])
     # generate the base_img by running the pytorch fp32 pipeline (origin code in canny2image_TRT.py)
