@@ -29,22 +29,23 @@ class hackathon():
         """-----------------------------------------------加载controlnet的engine模型-----------------------------------------------"""
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
-        with open("./sd_control_fp16.engine", 'rb') as f:
+        with open("./models/enginemodels/sd_control_fp16-test.engine", 'rb') as f:
             engine_str = f.read()
         control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
         control_context = control_engine.create_execution_context()
         self.model.control_context = control_context
-        print("finished")
+        print("加载成功controlnet的engine")
         """-----------------------------------------------"""
 
         """-----------------------------------------------加载unet的engine模型-----------------------------------------------"""
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
-        with open("./sd_diffusion_fp16.engine", 'rb') as f:
+        with open("./models/enginemodels/sd_diffusion_fp16-test.engine", 'rb') as f:
             diffusion_engine_str = f.read()
         diffusion_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(diffusion_engine_str)
         diffusion_context = diffusion_engine.create_execution_context()
         self.model.diffusion_context = diffusion_context
+        print("加载成功diffusion_model的engine")
         """-----------------------------------------------"""
     def process(self, input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, low_threshold, high_threshold):
         with torch.no_grad():
