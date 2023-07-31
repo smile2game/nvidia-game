@@ -38,7 +38,7 @@ class hackathon():
 
         torch.onnx.export(control_model,               
                             (x_in, h_in, t_in, c_in),  
-                            "./sd_control_fp16.onnx",   
+                            "sd_control_fp16.onnx",   
                             export_params=True,
                             opset_version=16,
                             do_constant_folding=True,
@@ -77,7 +77,7 @@ class hackathon():
         print("开始转换diffusion_model为onnx！\n")
         torch.onnx.export(diffusion_model,               
                             (x_in, time_in, context_in, control),  
-                            "./sd_diffusion_fp16.onnx",   
+                            "sd_diffusion_fp16.onnx",   
                             export_params=True,#
                             opset_version=16,
                             keep_initializers_as_inputs=True,
@@ -103,5 +103,5 @@ class hackathon():
         # 最后，将DDIMSampler中调用pytorch4个子模型操作的部分，用engine推理代替，工作就做完了。
 
 if __name__ == "__main__":
-    h = hackathon()
-    h.initialize()
+    hk = hackathon()
+    hk.initialize()
