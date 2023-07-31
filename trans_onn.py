@@ -34,16 +34,10 @@ class hackathon():
         h_in = torch.randn(1, 3, H, W, dtype=torch.float32).to("cuda")
         t_in = torch.zeros(1, dtype=torch.int64).to("cuda")
         c_in = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
-        # controls = control_model(x=x_in, hint=h_in, timesteps=t_in, context=c_in) #这里是一个测验
         output_names = []
         for i in range(13): #这里还不知道为什么是13,但确实是13个
             output_names.append("out_"+ str(i))
-        # dynamic_table = {'x_in' : {0 : 'bs', 2 : 'H', 3 : 'W'}, 
-        #                     'h_in' : {0 : 'bs', 2 : '8H', 3 : '8W'}, 
-        #                     't_in' : {0 : 'bs'}, 
-        #                     'c_in' : {0 : 'bs'}} #这里是需要看一下怎么写的
-        # for i in range(13):
-        #     dynamic_table[output_names[i]] = {0 : "bs"}
+
         torch.onnx.export(control_model,               
                             (x_in, h_in, t_in, c_in),  
                             "./sd_control_fp16-test.onnx",   
@@ -81,10 +75,7 @@ class hackathon():
         control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
         input_names = ["x_in", "time_in", "context_in","crotrol"]
         output_names = ["out_h"]
-        # dynamic_table = {"x_in" : {0 : "bs", 2 : "H", 3 : "W"},
-        #                  "time_in" : {0 : "bs"},
-        #                  "context_in" : {0 : "bs"},
-        #                 }
+        
         print("开始转换diffusion_model为onnx！\n")
         torch.onnx.export(diffusion_model,               
                             (x_in, time_in, context_in, control),  

@@ -39,11 +39,11 @@ for i in range(20):
             100, 
             200)
     end = datetime.datetime.now().timestamp()
-    print("time cost is: \n加上引擎死命跑！！\n", (end-start)*1000)
+    print("time cost is: \n加上引擎死命跑！！用时:", (end-start)*1000)
     new_path = "./bird_"+ str(i) + ".jpg"
     cv2.imwrite(new_path, new_img[0])
     # generate the base_img by running the pytorch fp32 pipeline (origin code in canny2image_TRT.py)
     base_path = path
     score = PD(base_path, new_path)
-    print("score is: ", score)
+    print("得到的分数是: ", score)
 
