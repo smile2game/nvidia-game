@@ -40,7 +40,7 @@ class hackathon():
 
         torch.onnx.export(control_model,               
                             (x_in, h_in, t_in, c_in),  
-                            "./sd_control_fp16-test.onnx",   
+                            "./sd_control_fp16.onnx",   
                             export_params=True,
                             opset_version=16,
                             do_constant_folding=True,
@@ -75,11 +75,11 @@ class hackathon():
         control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
         input_names = ["x_in", "time_in", "context_in","crotrol"]
         output_names = ["out_h"]
-        
+
         print("开始转换diffusion_model为onnx！\n")
         torch.onnx.export(diffusion_model,               
                             (x_in, time_in, context_in, control),  
-                            "./sd_diffusion_fp16-test.onnx",   
+                            "./sd_diffusion_fp16.onnx",   
                             export_params=True,#
                             opset_version=16,
                             keep_initializers_as_inputs=True,
