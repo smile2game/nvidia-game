@@ -24,9 +24,7 @@ class hackathon():
         self.ddim_sampler = DDIMSampler(self.model)
         H = 256
         W = 384
-        """----------------------------------------------转换cond_stage_model为engine-----------------"""
-        cond_stage_model = self.model.cond_stage_model
-        """-----------------------------------------------"""
+
 
         """-----------------------------------------------转换control_model为engine-----------------------------------------------"""
         control_model = self.model.control_model
@@ -95,6 +93,10 @@ class hackathon():
             pass
         """-----------------------------------------------"""
 
+
+        """----------------------------------------------转换cond_stage_model为engine-----------------"""
+        cond_stage_model = self.model.cond_stage_model
+        """-----------------------------------------------"""
         # 建议将TensorRT的engine存到一个dict中，然后将dict给下面的DDIMSampler做初始化
         # 例如self.engine = {"clip": xxx_engine, "control_net": xxx_engine, ...}
         #self.ddim_sampler = DDIMSampler(self.model, engine=self.engine)
