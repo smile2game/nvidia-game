@@ -28,7 +28,7 @@ for i in range(20):
             "a bird", 
             "best quality, extremely detailed", 
             "longbody, lowres, bad anatomy, bad hands, missing fingers", 
-            1, #
+            1,   #按理说应该暂停了，怎么继续往下读取字符串
             256, 
             20,
             False, 

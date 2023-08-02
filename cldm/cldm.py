@@ -396,13 +396,6 @@ class ControlLDM(LatentDiffusion):
 
             # eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
             ################################# update: diffusion trt infer ########################################
-            # del buffer_device[1]
-            # for temp in control:
-            #     buffer_device.append(temp.reshape(-1).data_ptr())
-            # eps = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to("cuda")
-            # buffer_device.append(eps.reshape(-1).data_ptr())
-            # self.diffusion_context.execute_v2(buffer_device)
-
             buffer_device = []
             buffer_device.append(x_noisy.reshape(-1).data_ptr())
             buffer_device.append(t.reshape(-1).data_ptr())
@@ -424,7 +417,7 @@ class ControlLDM(LatentDiffusion):
     def log_images(self, batch, N=4, n_row=2, sample=False, ddim_steps=50, ddim_eta=0.0, return_keys=None,
                    quantize_denoised=True, inpaint=True, plot_denoise_rows=False, plot_progressive_rows=True,
                    plot_diffusion_rows=False, unconditional_guidance_scale=9.0, unconditional_guidance_label=None,
-                   use_ema_scope=True,
+                   use_ema_scope=True,  
                    **kwargs):
         use_ddim = ddim_steps is not None
 

@@ -24,13 +24,30 @@ class hackathon():
         self.ddim_sampler = DDIMSampler(self.model)
         H = 256
         W = 384
-        """----------------------------------------------转换cond_stage_model为engine-----------------"""
+        """----------------------------------------------转换cond_stage_model为onnx-----------------"""
         cond_stage_model = self.model.cond_stage_model
+        self.tokenizer = cond_stage_model.tokenizer
+        clip = cond_stage_model.transformer #
+        if not os.path.isfile("./models/onnxmodels/sd_clip_fp16-test1.onnx"):
+            input_ids = torch.full((1,77),1, dtype=torch.int64).to("cuda")  #需要特别注意这里的输入是int64
+            input_names = ["input_ids"]
+            output_names = ["outputs"]
+            print("开始转换clip为onnx")
+            torch.onnx.export(clip,
+                              (input_ids),
+                             "./models/onnxmodels/sd_clip_fp16-test.onnx",
+                            export_params=True,
+                            opset_version=16,
+                            do_constant_folding=True,
+                            keep_initializers_as_inputs=True,
+                            input_names = input_names, 
+                            output_names = output_names)
+            print("clip转换完成")
         """-----------------------------------------------"""
 
-        """-----------------------------------------------转换control_model为engine-----------------------------------------------"""
+        """-----------------------------------------------转换control_model为onnx-----------------------------------------------"""
         control_model = self.model.control_model
-        if not os.path.isfile("./models/enginemodels/sd_control_fp16-test.engine"):
+        if not os.path.isfile("./models/onnxmodels/sd_control_fp16-test.onnx"):
             x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
             h_in = torch.randn(1, 3, H, W, dtype=torch.float32).to("cuda")
             t_in = torch.zeros(1, dtype=torch.int64).to("cuda")
@@ -45,6 +62,7 @@ class hackathon():
             #                     'c_in' : {0 : 'bs'}} #这里是需要看一下怎么写的
             # for i in range(13):
             #     dynamic_table[output_names[i]] = {0 : "bs"}
+            print("开始转换control为onnx")
             torch.onnx.export(control_model,               
                                 (x_in, h_in, t_in, c_in),  
                                 "./models/onnxmodels/sd_control_fp16-test.onnx",   
@@ -54,15 +72,12 @@ class hackathon():
                                 keep_initializers_as_inputs=True,
                                 input_names = ['x_in', "h_in", "t_in", "c_in"], 
                                 output_names = output_names)
-                                # dynamic_axes = dynamic_table)
-            # --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768
-        print("controlnet成功转为engine模型")
+            print("control转换完成")
         """-----------------------------------------------"""
 
-        """-----------------------------------------------转换diffusion_model为engine-----------------------------------------------"""
+        """-----------------------------------------------转换diffusion_model为onnx-----------------------------------------------"""
         diffusion_model = self.model.model.diffusion_model #找对了
-        if not os.path.isfile("./models/enginemodels/sd_diffusion_fp16-test.onnx"):
-            print("转换diffusion_model为onnx模型")
+        if not os.path.isfile("./models/onnxmodels/sd_diffusion_fp16-test.onnx"):
             x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
             time_in = torch.zeros(1, dtype=torch.int64).to("cuda")
             context_in = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
@@ -82,10 +97,6 @@ class hackathon():
             control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
             input_names = ["x_in", "time_in", "context_in","crotrol"]
             output_names = ["out_h"]
-            # dynamic_table = {"x_in" : {0 : "bs", 2 : "H", 3 : "W"},
-            #                  "time_in" : {0 : "bs"},
-            #                  "context_in" : {0 : "bs"},
-            #                 }
             print("开始转换diffusion_model为onnx！\n")
             torch.onnx.export(diffusion_model,               
                                 (x_in, time_in, context_in, control),  
@@ -99,16 +110,16 @@ class hackathon():
             print("转换diffusion_model为onnx成功！")
         """-----------------------------------------------"""
 
-        """----------------------------------------------转换cond_stage_model为engine-----------------"""
+        """----------------------------------------------转换cond_stage_model为onnx-----------------"""
         first_stage_model = self.model.first_stage_model
-        if not os.path.isfile("first_stage_fp16.engine"):
+        if not os.path.isfile("first_stage_fp16.onnx"):
             pass
         """-----------------------------------------------"""
 
-        # 建议将TensorRT的engine存到一个dict中，然后将dict给下面的DDIMSampler做初始化
-        # 例如self.engine = {"clip": xxx_engine, "control_net": xxx_engine, ...}
-        #self.ddim_sampler = DDIMSampler(self.model, engine=self.engine)
-        # 最后，将DDIMSampler中调用pytorch4个子模型操作的部分，用engine推理代替，工作就做完了。
+        # 建议将TensorRT的onnx存到一个dict中，然后将dict给下面的DDIMSampler做初始化
+        # 例如self.onnx = {"clip": xxx_onnx, "control_net": xxx_onnx, ...}
+        #self.ddim_sampler = DDIMSampler(self.model, onnx=self.onnx)
+        # 最后，将DDIMSampler中调用pytorch4个子模型操作的部分，用onnx推理代替，工作就做完了。
 
 if __name__ == "__main__":
     h = hackathon()

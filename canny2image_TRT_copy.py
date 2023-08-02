@@ -26,6 +26,20 @@ class hackathon():
         self.ddim_sampler = DDIMSampler(self.model)
         H = 256
         W = 384
+
+        # """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
+        # self.trt_logger = trt.Logger(trt.Logger.WARNING) #创建logger记录
+        # trt.init_libnvinfer_plugins(self.trt_logger, '') #初始化插件库
+        # with open("./models/enginemodels/sd_clip_fp16-test.engine", 'rb') as f:
+        #     engine_str = f.read() #读取字节1
+        # clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str) #字节序列恢复为对象
+        # clip_context = clip_engine.create_execution_context() #创建推理的上下文context
+        # #这里加载进去context
+        # self.model.cond_stage_model.clip_context = clip_context #替换模型的上下文，与engine是1对多
+        # print("加载成功clip的engine")
+        # """-----------------------------------------------"""
+
+
         """-----------------------------------------------加载controlnet的engine模型-----------------------------------------------"""
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
@@ -66,7 +80,7 @@ class hackathon():
             if config.save_memory:
                 self.model.low_vram_shift(is_diffusing=False)
 
-            cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples)]}
+            cond = {"c_concat": [control], "c_crossattn": [self.model.get_learned_conditioning([prompt + ', ' + a_prompt] * num_samples)]} #这一条可以顺利执行
             un_cond = {"c_concat": None if guess_mode else [control], "c_crossattn": [self.model.get_learned_conditioning([n_prompt] * num_samples)]}
             shape = (4, H // 8, W // 8)
 

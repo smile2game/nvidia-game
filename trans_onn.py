@@ -24,6 +24,27 @@ class hackathon():
         self.ddim_sampler = DDIMSampler(self.model)
         H = 256
         W = 384
+        
+        """----------------------------------------------转换cond_stage_model为engine-----------------"""
+        cond_stage_model = self.model.cond_stage_model
+        self.tokenizer = cond_stage_model.tokenizer
+        clip = cond_stage_model.transformer #
+        input_ids = torch.full((1,77),1, dtype=torch.int64).to("cuda")  #需要特别注意这里的输入是int64
+        input_names = ["input_ids"]
+        output_names = ["outputs"]
+        print("开始转换clip为onnx")
+        torch.onnx.export(clip,
+                            (input_ids),
+                            "sd_clip_fp16-test.onnx",
+                        export_params=True,
+                        opset_version=16,
+                        do_constant_folding=True,
+                        keep_initializers_as_inputs=True,
+                        input_names = input_names, 
+                        output_names = output_names)
+        print("clip转换完成")
+        """-----------------------------------------------"""
+
 
 
         """-----------------------------------------------转换control_model为engine-----------------------------------------------"""
@@ -52,7 +73,6 @@ class hackathon():
 
         """-----------------------------------------------转换diffusion_model为engine-----------------------------------------------"""
         diffusion_model = self.model.model.diffusion_model #找对了
-        
         print("转换diffusion_model为onnx模型")
         x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
         time_in = torch.zeros(1, dtype=torch.int64).to("cuda")
@@ -87,16 +107,10 @@ class hackathon():
         print("转换diffusion_model为onnx成功！")
         """-----------------------------------------------"""
 
-        """----------------------------------------------转换cond_stage_model为engine-----------------"""
-        first_stage_model = self.model.first_stage_model
-        if not os.path.isfile("first_stage_fp16.engine"):
-            pass
-        """-----------------------------------------------"""
 
 
-        """----------------------------------------------转换cond_stage_model为engine-----------------"""
-        cond_stage_model = self.model.cond_stage_model
-        """-----------------------------------------------"""
+
+ 
         # 建议将TensorRT的engine存到一个dict中，然后将dict给下面的DDIMSampler做初始化
         # 例如self.engine = {"clip": xxx_engine, "control_net": xxx_engine, ...}
         #self.ddim_sampler = DDIMSampler(self.model, engine=self.engine)

@@ -664,7 +664,7 @@ class LatentDiffusion(DDPM):
     def get_learned_conditioning(self, c):
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
-                c = self.cond_stage_model.encode(c)
+                c = self.cond_stage_model.encode(c) #这里的输入是一个字符串列表["dash"] 
                 if isinstance(c, DiagonalGaussianDistribution):
                     c = c.mode()
             else:
