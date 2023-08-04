@@ -664,7 +664,7 @@ class LatentDiffusion(DDPM):
     def get_learned_conditioning(self, c):
         if self.cond_stage_forward is None:
             if hasattr(self.cond_stage_model, 'encode') and callable(self.cond_stage_model.encode):
-                c = self.cond_stage_model.encode(c) #这里的输入是一个字符串列表["dash"] 
+                c = self.cond_stage_model.encode(c) #这里的输入是一个字符串列表["dash"] 都走这条路
                 if isinstance(c, DiagonalGaussianDistribution):
                     c = c.mode()
             else:
@@ -677,7 +677,6 @@ class LatentDiffusion(DDPM):
     def meshgrid(self, h, w):
         y = torch.arange(0, h).view(h, 1, 1).repeat(1, w, 1)
         x = torch.arange(0, w).view(1, w, 1).repeat(h, 1, 1)
-
         arr = torch.cat([y, x], dim=-1)
         return arr
 

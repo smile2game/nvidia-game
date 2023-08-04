@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import torch.nn as nn
 from torch.utils.checkpoint import checkpoint
 
@@ -95,11 +96,14 @@ class FrozenCLIPEmbedder(AbstractEncoder):
     def __init__(self, version="openai/clip-vit-large-patch14", device="cuda", max_length=77,
                  freeze=True, layer="last", layer_idx=None):  # clip-vit-base-patch32
         super().__init__()
+        
         assert layer in self.LAYERS
         self.tokenizer = CLIPTokenizer.from_pretrained(version)
         self.transformer = CLIPTextModel.from_pretrained(version)
         self.device = device
         self.max_length = max_length
+        # self.tokens = torch.zeros(1,77,dtype = torch.int32).to("cuda")
+        # self.outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
         if freeze:
             self.freeze()
         self.layer = layer
@@ -115,28 +119,31 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             param.requires_grad = False
 
     def forward(self, text):
+        import os
+        os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
         batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
+        # batch_encoding['input_ids'] = batch_encoding['input_ids'].to(torch.int32)
         tokens = batch_encoding["input_ids"].to(self.device)
-
-        # outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")
+        # tokens = batch_encoding["input_ids"].to('cpu')
+        outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")
         # if self.layer == "last":  #这一条最后是要走的路
-        #     z = outputs.last_hidden_state
+        #     z = outputs.last_hidden_state  #1 2 
         # elif self.layer == "pooled":
         #     z = outputs.pooler_output[:, None, :]
         # else:
         #     z = outputs.hidden_states[self.layer_idx]
         ################################## update: clip trt infer ########################################
-        buffer_device = [] #记录输入输出的地址指针
-        buffer_device.append(tokens.reshape(-1).data_ptr())
-        outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
-        # outputs =  {"last_hidden_state.shape" :torch.zeros(1,77,768, dtype=torch.float32).to("cuda"),
-        #             "pooler_output":torch.zeros(1,768, dtype=torch.float32).to("cuda")}
-        buffer_device.append(outputs.reshape(-1).data_ptr())
-        self.clip_context.execute_v2(buffer_device)
-        z = outputs #这里已经调通了
+        # buffer_device = [] #记录输入输出的地址指针   
+        # buffer_device.append(tokens.reshape(-1).data_ptr())
+        # # outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
+        # outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cpu")
+        # buffer_device.append(outputs.reshape(-1).data_ptr())
+        # self.clip_context.execute_v2(buffer_device)   #这里是真的有大问题
+        # z = self.outputs #这里已经调通了
         #######################################################################################################
-        return z
+        # outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
+        return outputs['last_hidden_state']
 
     def encode(self, text):
         return self(text)

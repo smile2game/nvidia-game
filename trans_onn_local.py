@@ -26,16 +26,16 @@ class hackathon():
         W = 384
         """----------------------------------------------转换cond_stage_model为onnx-----------------"""
         cond_stage_model = self.model.cond_stage_model
-        self.tokenizer = cond_stage_model.tokenizer
+        # self.tokenizer = cond_stage_model.tokenizer
         clip = cond_stage_model.transformer #
-        if not os.path.isfile("./models/onnxmodels/sd_clip_fp16-test1.onnx"):
-            input_ids = torch.full((1,77),1, dtype=torch.int64).to("cuda")  #需要特别注意这里的输入是int64
+        if not os.path.isfile("./models/onnxmodels/sd_clip_fp16-test-int32-torch_in.onnx"):
+            input_ids = torch.zeros((1,77),dtype=torch.int64).to("cuda")  #需要特别注意这里的输入是int64
             input_names = ["input_ids"]
             output_names = ["outputs"]
             print("开始转换clip为onnx")
             torch.onnx.export(clip,
                               (input_ids),
-                             "./models/onnxmodels/sd_clip_fp16-test.onnx",
+                             "./models/onnxmodels/sd_clip_fp16-test-int32-torch_in.onnx",
                             export_params=True,
                             opset_version=16,
                             do_constant_folding=True,

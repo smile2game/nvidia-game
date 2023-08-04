@@ -30,7 +30,7 @@ class hackathon():
         # """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
         # self.trt_logger = trt.Logger(trt.Logger.WARNING) #创建logger记录
         # trt.init_libnvinfer_plugins(self.trt_logger, '') #初始化插件库
-        # with open("./models/enginemodels/sd_clip_fp16-test.engine", 'rb') as f:
+        # with open("./models/enginemodels/sd_clip_fp16-test-int32-fp32.engine", 'rb') as f:
         #     engine_str = f.read() #读取字节1
         # clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str) #字节序列恢复为对象
         # clip_context = clip_engine.create_execution_context() #创建推理的上下文context
@@ -72,11 +72,9 @@ class hackathon():
             control = torch.from_numpy(detected_map.copy()).float().cuda() / 255.0
             control = torch.stack([control for _ in range(num_samples)], dim=0)
             control = einops.rearrange(control, 'b h w c -> b c h w').clone()
-
             if seed == -1:
                 seed = random.randint(0, 65535)
             seed_everything(seed)
-
             if config.save_memory:
                 self.model.low_vram_shift(is_diffusing=False)
 

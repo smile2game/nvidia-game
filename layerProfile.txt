@@ -1,0 +1,4 @@
+[
+  { "count" : 3640 }
+, { "name" : "{ForeignNode[(Unnamed Layer* 1248) [Identity].../text_model/Gather_2]}", "timeMs" : 3597.25, "averageMs" : 0.988255, "medianMs" : 0.941056, "percentage" : 100 }
+]
