@@ -1,0 +1,4 @@
+[
+  { "count" : 3679 }
+, { "name" : "{ForeignNode[text_model.embeddings.position_embedding.weight.../text_model/Gather_5]}", "timeMs" : 3596.59, "averageMs" : 0.9776, "medianMs" : 0.930816, "percentage" : 100 }
+]

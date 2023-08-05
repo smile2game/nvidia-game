@@ -28,21 +28,27 @@ class hackathon():
         cond_stage_model = self.model.cond_stage_model
         # self.tokenizer = cond_stage_model.tokenizer
         clip = cond_stage_model.transformer #
-        if not os.path.isfile("./models/onnxmodels/sd_clip_fp16-test-int32-torch_in.onnx"):
-            input_ids = torch.zeros((1,77),dtype=torch.int64).to("cuda")  #需要特别注意这里的输入是int64
-            input_names = ["input_ids"]
-            output_names = ["outputs"]
-            print("开始转换clip为onnx")
-            torch.onnx.export(clip,
-                              (input_ids),
-                             "./models/onnxmodels/sd_clip_fp16-test-int32-torch_in.onnx",
-                            export_params=True,
-                            opset_version=16,
-                            do_constant_folding=True,
-                            keep_initializers_as_inputs=True,
-                            input_names = input_names, 
-                            output_names = output_names)
-            print("clip转换完成")
+        # if not os.path.isfile("./models/onnxmodels/sd_clip_fp16-test-2131.onnx"):
+        input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
+        dynamic_axes = {'input_ids' : {0 : 'bs'},
+                        'context' : {0 : 'bs'},
+                        'pooled_output' : {0 : 'bs'}}
+        input_names = ["input_ids"]
+        output_names = ["context","pooled_output"]
+        print("开始转换clip为onnx")
+        torch.onnx.export(clip,
+                            (input_ids),
+                            "./models/onnxmodels/sd_clip_fp32-test-1326.onnx",
+                        export_params=True,
+                        opset_version=16,
+                        do_constant_folding=True,
+                        keep_initializers_as_inputs=True,
+                        input_names = input_names, 
+                        output_names = output_names,
+                        dynamic_axes=dynamic_axes)
+        print("clip转换完成")
+
+        # os.system("trtexec --onnx=./models/onnxmodels/sd_clip_fp32-test-1326.onnx --saveEngine=./models/enginemodels/sd_clip_fp32-test-1326.plan --workspace=1000")
         """-----------------------------------------------"""
 
         """-----------------------------------------------转换control_model为onnx-----------------------------------------------"""

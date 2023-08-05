@@ -1,61 +1,36 @@
-import torch
-import tensorrt as trt
-# time_in = torch.zeros(1, dtype=torch.int64).to("cuda")
-# device = time_in.device
-# print(time_in)
-# H = 256
-# W = 384
-# control = []
-# control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-# control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-# for i in range(13):
-#     print(control[i].shape)
-from share import *
-import config
-
-import cv2
-import einops
-import gradio as gr
-import numpy as np
-import torch
-import random
 import os
+import numpy as np
 import tensorrt as trt
-from ldm.util import log_txt_as_img, exists, instantiate_from_config
-from pytorch_lightning import seed_everything
-from annotator.util import resize_image, HWC3
-from annotator.canny import CannyDetector
-from cldm.model import create_model, load_state_dict
-from cldm.ddim_hacked import DDIMSampler
-
-apply_canny = CannyDetector()
-model = create_model('./models/cldm_v15.yaml').cpu()
-model.load_state_dict(load_state_dict('/home/player/ControlNet/models/control_sd15_canny.pth', location='cuda'))
-model = model.cuda()
-ddim_sampler = DDIMSampler(model)
+from cuda import cudart
+import torch
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
+os.environ["TORCH_USE_CUDA_DSA"] = "1"
 H = 256
 W = 384
-trt_logger = trt.Logger(trt.Logger.WARNING)
-trt.init_libnvinfer_plugins(trt_logger, '')
+#trtexec --onnx=./models/onnxmodels/sd_clip_fp16-test-2131.onnx --saveEngine=./models/enginemodels/sd_clip_fp16-test-2131.engine --verbose=True 
 
-with open("./sd_diffusion_fp16.engine", 'rb') as f:
-            engine_str = f.read()
+trtFile = "./models/enginemodels/sd_clip_fp32-test-1326.plan"
+data = torch.zeros(1, 77, dtype=torch.int64).to('cuda')
 
-control_engine = trt.Runtime(trt_logger).deserialize_cuda_engine(engine_str)
-control_context = control_engine.create_execution_context()
 
-# control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
-# control_context.set_binding_shape(1, (1, 3, H, W))
-# control_context.set_binding_shape(2, (1,))
-# control_context.set_binding_shape(3, (1, 77, 768))
+def run():
+    logger = trt.Logger(trt.Logger.VERBOSE)  
+    with open(trtFile, "rb") as f:
+            engineString = f.read()
+
+    #生成推理引擎
+    engine = trt.Runtime(logger).deserialize_cuda_engine(engineString)                                    
+    context = engine.create_execution_context()
+    buffer_device = []
+    buffer_device.append(data.reshape(-1).data_ptr())
+
+    output1 = torch.randn(1, 77,768,dtype=torch.float32).cuda()
+    output2 = torch.randn(1, 768,dtype=torch.float32).cuda()
+    buffer_device.append(output1.reshape(-1).data_ptr())
+    buffer_device.append(output2.reshape(-1).data_ptr())
+    context.execute_v2(buffer_device)
+    print(output1)
+    print(output2)
+if __name__ == "__main__":
+    run()
+    

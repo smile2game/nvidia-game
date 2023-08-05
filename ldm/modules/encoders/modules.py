@@ -123,10 +123,9 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
         batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
-        # batch_encoding['input_ids'] = batch_encoding['input_ids'].to(torch.int32)
-        tokens = batch_encoding["input_ids"].to(self.device)
-        # tokens = batch_encoding["input_ids"].to('cpu')
-        outputs = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")
+        tokens = batch_encoding["input_ids"].to(self.device).to(torch.int32)
+        #context = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")["last_hidden_state"]
+        # outputs = self.transformer(input_ids=tokens)
         # if self.layer == "last":  #这一条最后是要走的路
         #     z = outputs.last_hidden_state  #1 2 
         # elif self.layer == "pooled":
@@ -134,16 +133,18 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         # else:
         #     z = outputs.hidden_states[self.layer_idx]
         ################################## update: clip trt infer ########################################
-        # buffer_device = [] #记录输入输出的地址指针   
-        # buffer_device.append(tokens.reshape(-1).data_ptr())
-        # # outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
+        buffer_device = [] #记录输入输出的地址指针   
+        buffer_device.append(tokens.reshape(-1).data_ptr())
+        context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
+        pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
         # outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cpu")
-        # buffer_device.append(outputs.reshape(-1).data_ptr())
-        # self.clip_context.execute_v2(buffer_device)   #这里是真的有大问题
-        # z = self.outputs #这里已经调通了
+        buffer_device.append(context.reshape(-1).data_ptr())
+        buffer_device.append(pooled_output.reshape(-1).data_ptr())
+        self.clip_context.execute_v2(buffer_device)   #这里是真的有大问题
         #######################################################################################################
         # outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
-        return outputs['last_hidden_state']
+        #return outputs['last_hidden_state']
+        return context
 
     def encode(self, text):
         return self(text)

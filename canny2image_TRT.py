@@ -29,7 +29,7 @@ class hackathon():
         # """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
         self.trt_logger = trt.Logger(trt.Logger.WARNING) #创建logger记录
         trt.init_libnvinfer_plugins(self.trt_logger, '') #初始化插件库
-        with open("sd_clip_fp16-test.engine", 'rb') as f:
+        with open("sd_clip_fp32.plan", 'rb') as f:
             engine_str = f.read() #读取字节1
         clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str) #字节序列恢复为对象
         clip_context = clip_engine.create_execution_context() #创建推理的上下文context

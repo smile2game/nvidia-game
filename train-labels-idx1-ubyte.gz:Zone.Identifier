@@ -1,0 +1,4 @@
+[ZoneTransfer]
+ZoneId=3
+ReferrerUrl=http://yann.lecun.com/exdb/mnist/
+HostUrl=http://yann.lecun.com/exdb/mnist/train-labels-idx1-ubyte.gz

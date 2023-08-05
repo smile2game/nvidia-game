@@ -27,21 +27,26 @@ class hackathon():
         
         """----------------------------------------------转换cond_stage_model为engine-----------------"""
         cond_stage_model = self.model.cond_stage_model
-        self.tokenizer = cond_stage_model.tokenizer
+        # self.tokenizer = cond_stage_model.tokenizer
         clip = cond_stage_model.transformer #
-        input_ids = torch.full((1,77),1, dtype=torch.int64).to("cuda")  #需要特别注意这里的输入是int64
+        # if not os.path.isfile("./models/onnxmodels/sd_clip_fp16-test-2131.onnx"):
+        input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
+        dynamic_axes = {'input_ids' : {0 : 'bs'},
+                        'context' : {0 : 'bs'},
+                        'pooled_output' : {0 : 'bs'}}
         input_names = ["input_ids"]
-        output_names = ["outputs"]
+        output_names = ["context","pooled_output"]
         print("开始转换clip为onnx")
         torch.onnx.export(clip,
                             (input_ids),
-                            "sd_clip_fp16-test.onnx",
+                            "sd_clip_fp32.onnx",
                         export_params=True,
                         opset_version=16,
                         do_constant_folding=True,
                         keep_initializers_as_inputs=True,
                         input_names = input_names, 
-                        output_names = output_names)
+                        output_names = output_names,
+                        dynamic_axes=dynamic_axes)
         print("clip转换完成")
         """-----------------------------------------------"""
 

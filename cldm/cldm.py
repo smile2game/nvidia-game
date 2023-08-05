@@ -329,7 +329,6 @@ class ControlLDM(LatentDiffusion):
     def apply_model(self, x_noisy, t, cond, *args, **kwargs):
         assert isinstance(cond, dict)
         diffusion_model = self.model.diffusion_model
-
         cond_txt = torch.cat(cond['c_crossattn'], 1)
 
         if cond['c_concat'] is None:
