@@ -24,7 +24,6 @@ class hackathon():
         self.ddim_sampler = DDIMSampler(self.model)
         H = 256
         W = 384
-        
         """----------------------------------------------转换cond_stage_model为engine-----------------"""
         cond_stage_model = self.model.cond_stage_model
         # self.tokenizer = cond_stage_model.tokenizer
@@ -38,8 +37,8 @@ class hackathon():
         output_names = ["context","pooled_output"]
         print("开始转换clip为onnx")
         torch.onnx.export(clip,
-                            (input_ids),
-                            "sd_clip_fp32.onnx",
+                        (input_ids),
+                        "sd_clip_fp32.onnx",
                         export_params=True,
                         opset_version=16,
                         do_constant_folding=True,
