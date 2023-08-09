@@ -25,28 +25,28 @@ class hackathon():
         H = 256
         W = 384
         """----------------------------------------------转换cond_stage_model为engine-----------------"""
-        cond_stage_model = self.model.cond_stage_model
-        # self.tokenizer = cond_stage_model.tokenizer
-        clip = cond_stage_model.transformer #
-        # if not os.path.isfile("./models/onnxmodels/sd_clip_fp16-test-2131.onnx"):
-        input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
-        dynamic_axes = {'input_ids' : {0 : 'bs'},
-                        'context' : {0 : 'bs'},
-                        'pooled_output' : {0 : 'bs'}}
-        input_names = ["input_ids"]
-        output_names = ["context","pooled_output"]
-        print("开始转换clip为onnx")
-        torch.onnx.export(clip,
-                        (input_ids),
-                        "sd_clip_fp32.onnx",
-                        export_params=True,
-                        opset_version=16,
-                        do_constant_folding=True,
-                        keep_initializers_as_inputs=True,
-                        input_names = input_names, 
-                        output_names = output_names,
-                        dynamic_axes=dynamic_axes)
-        print("clip转换完成")
+        # cond_stage_model = self.model.cond_stage_model
+        # # self.tokenizer = cond_stage_model.tokenizer
+        # clip = cond_stage_model.transformer #
+        # # if not os.path.isfile("./models/onnxmodels/sd_clip_fp16-test-2131.onnx"):
+        # input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
+        # dynamic_axes = {'input_ids' : {0 : 'bs'},
+        #                 'context' : {0 : 'bs'},
+        #                 'pooled_output' : {0 : 'bs'}}
+        # input_names = ["input_ids"]
+        # output_names = ["context","pooled_output"]
+        # print("开始转换clip为onnx")
+        # torch.onnx.export(clip,
+        #                 (input_ids),
+        #                 "sd_clip_fp32.onnx",
+        #                 export_params=True,
+        #                 opset_version=16,
+        #                 do_constant_folding=True,
+        #                 keep_initializers_as_inputs=True,
+        #                 input_names = input_names, 
+        #                 output_names = output_names,
+        #                 dynamic_axes=dynamic_axes)
+        # print("clip转换完成")
         """-----------------------------------------------"""
 
 
@@ -65,7 +65,7 @@ class hackathon():
                             (x_in, h_in, t_in, c_in),  
                             "sd_control_fp16.onnx",   
                             export_params=True,
-                            opset_version=16,
+                            opset_version=17,
                             do_constant_folding=True,
                             keep_initializers_as_inputs=True,
                             input_names = ['x_in', "h_in", "t_in", "c_in"], 
@@ -103,7 +103,7 @@ class hackathon():
                             (x_in, time_in, context_in, control),  
                             "sd_diffusion_fp16.onnx",   
                             export_params=True,#
-                            opset_version=16,
+                            opset_version=17,
                             keep_initializers_as_inputs=True,
                             do_constant_folding=True,
                             input_names =input_names, 
@@ -111,10 +111,6 @@ class hackathon():
         print("转换diffusion_model为onnx成功！")
         """-----------------------------------------------"""
 
-
-
-
- 
         # 建议将TensorRT的engine存到一个dict中，然后将dict给下面的DDIMSampler做初始化
         # 例如self.engine = {"clip": xxx_engine, "control_net": xxx_engine, ...}
         #self.ddim_sampler = DDIMSampler(self.model, engine=self.engine)

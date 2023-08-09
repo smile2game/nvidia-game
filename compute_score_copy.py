@@ -5,7 +5,7 @@ import cv2
 import datetime
 from canny2image_TRT_copy import hackathon
 import os 
-os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+
 
 block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
 model = InceptionV3([block_idx]).to("cuda")
@@ -22,6 +22,8 @@ scores = []
 latencys = []
 hk = hackathon()
 hk.initialize()
+time_list = []
+score_list = []
 for i in range(20):
     path = "/home/player/pictures_croped/bird_"+ str(i) + ".jpg"
     img = cv2.imread(path)
@@ -34,18 +36,24 @@ for i in range(20):
             256, 
             20,
             False, 
-            1, 
-            9, 
+            1, #
+            9, #
             2946901, 
             0.0, 
             100, 
             200)
     end = datetime.datetime.now().timestamp()
-    print("time cost is: \n加上引擎开跑！！用时:", (end-start)*1000)
+    cost = (end-start)*1000
+    print("time cost is: \n加上引擎开跑！！用时:", cost)
+    time_list.append(cost)
     new_path = "./bird_"+ str(i) + ".jpg"
     cv2.imwrite(new_path, new_img[0])
     # generate the base_img by running the pytorch fp32 pipeline (origin code in canny2image_TRT.py)
     base_path = path
     score = PD(base_path, new_path)
+    score_list.append(score)
     print("得到的分数是: ", score)
-
+    
+print("------------\n----------时间列表为：",time_list)
+print("------------\n----------平均时间为：",np.mean(time_list))
+print("------------\n----------分数列表为：",score_list)

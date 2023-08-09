@@ -382,26 +382,16 @@ class ControlLDM(LatentDiffusion):
                 temp = torch.zeros(b, 1280, h//4, w//4, dtype=torch.float32).to("cuda")
                 control_out.append(temp)
                 buffer_device.append(temp.reshape(-1).data_ptr())
-
             for i in range(4):
                 temp = torch.zeros(b, 1280, h//8, w//8, dtype=torch.float32).to("cuda")
                 control_out.append(temp)
                 buffer_device.append(temp.reshape(-1).data_ptr())
-
             self.control_context.execute_v2(buffer_device)
 
             control = [c * scale for c, scale in zip(control_out, self.control_scales)]
-
-
-
             # eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
             ################################# update: diffusion trt infer ########################################
-            # del buffer_device[1]
-            # for temp in control:
-            #     buffer_device.append(temp.reshape(-1).data_ptr())
-            # eps = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to("cuda")
-            # buffer_device.append(eps.reshape(-1).data_ptr())
-            # self.diffusion_context.execute_v2(buffer_device)
+ 
 
             buffer_device = []
             buffer_device.append(x_noisy.reshape(-1).data_ptr())

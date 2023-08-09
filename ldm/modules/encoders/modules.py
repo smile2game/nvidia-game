@@ -1,3 +1,4 @@
+import datetime
 import torch
 import numpy as np
 import torch.nn as nn
@@ -119,12 +120,10 @@ class FrozenCLIPEmbedder(AbstractEncoder):
             param.requires_grad = False
 
     def forward(self, text):
-        import os
-        os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
         batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
-        tokens = batch_encoding["input_ids"].to(self.device).to(torch.int32)
-        #context = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")["last_hidden_state"]
+        tokens = batch_encoding["input_ids"].to(self.device)
+        context = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")["last_hidden_state"]
         # outputs = self.transformer(input_ids=tokens)
         # if self.layer == "last":  #这一条最后是要走的路
         #     z = outputs.last_hidden_state  #1 2 
@@ -133,14 +132,16 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         # else:
         #     z = outputs.hidden_states[self.layer_idx]
         ################################## update: clip trt infer ########################################
-        buffer_device = [] #记录输入输出的地址指针   
-        buffer_device.append(tokens.reshape(-1).data_ptr())
-        context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
-        pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
-        # outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cpu")
-        buffer_device.append(context.reshape(-1).data_ptr())
-        buffer_device.append(pooled_output.reshape(-1).data_ptr())
-        self.clip_context.execute_v2(buffer_device)   #这里是真的有大问题
+        # buffer_device = [] #记录输入输出的地址指针   
+        # buffer_device.append(tokens.reshape(-1).data_ptr())
+        # context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
+        # pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
+        # buffer_device.append(context.reshape(-1).data_ptr())
+        # buffer_device.append(pooled_output.reshape(-1).data_ptr())
+        # start = datetime.datetime.now().timestamp()
+        # self.clip_context.execute_v2(buffer_device)   #这里是真的有大问题
+        # end = datetime.datetime.now().timestamp()
+        # print("\nclip消耗时间为：", (end - start)*1000 )
         #######################################################################################################
         # outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
         #return outputs['last_hidden_state']
