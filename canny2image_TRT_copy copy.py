@@ -149,7 +149,7 @@ class hackathon():
         """----------------------------------------------转换cond_stage_model为engine-----------------"""
         first_stage_model = self.model.first_stage_model
         if not os.path.isfile("first_stage_fp16.engine"):
-            pass
+            
         """-----------------------------------------------"""
 
     def process(self, input_image, prompt, a_prompt, n_prompt, num_samples, image_resolution, ddim_steps, guess_mode, strength, scale, seed, eta, low_threshold, high_threshold):

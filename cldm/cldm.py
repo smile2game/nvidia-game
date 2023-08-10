@@ -333,7 +333,7 @@ class ControlLDM(LatentDiffusion):
         cond_txt = torch.cat(cond['c_crossattn'], 1)
 
         if cond['c_concat'] is None:
-
+            
             #eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=None, only_mid_control=self.only_mid_control)
             ################################# update: diffusion trt infer ########################################
             buffer_device = []
@@ -350,7 +350,7 @@ class ControlLDM(LatentDiffusion):
             # control = [c * scale for c, scale in zip(control, self.control_scales)]
             hint_in = torch.cat(cond['c_concat'], 1)
 
-            b, c, h, w = x_noisy.shape
+            # b, c, h, w = x_noisy.shape
 
             buffer_device = []
             buffer_device.append(x_noisy.reshape(-1).data_ptr())
