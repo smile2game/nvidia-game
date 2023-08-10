@@ -33,7 +33,7 @@ def gen_onnx():
     #                 output_names = output_names)
     # print("clip转换完成")
 
-    # onnx_model = onnx_from_path("sd_clip.onnx")
+    # onnx_model = onnx_from_path("./sd_clip.onnx")
     # # change onnx -inf to -1e4
     # for node in onnx_model.graph.node:
     #     if node.op_type == "ConstantOfShape":
