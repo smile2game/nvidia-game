@@ -27,15 +27,38 @@ class hackathon():
         H = 256
         W = 384
         # """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
-        # self.trt_logger = trt.Logger(trt.Logger.WARNING) #创建logger记录
-        # trt.init_libnvinfer_plugins(self.trt_logger, '') #初始化插件库
-        # with open("sd_clip_fp32.plan", 'rb') as f:
-        #     engine_str = f.read() #读取字节1
-        # clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str) #字节序列恢复为对象
-        # clip_context = clip_engine.create_execution_context() #创建推理的上下文context
-        # #这里加载进去context
-        # self.model.cond_stage_model.clip_context = clip_context #替换模型的上下文，与engine是1对多
-        # print("加载成功clip的engine")
+        cond_stage_model = self.model.cond_stage_model
+        clip = cond_stage_model.transformer #
+        input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
+        dynamic_axes = {'input_ids' : {0 : 'bs'},
+                        'context' : {0 : 'bs'},
+                        'pooled_output' : {0 : 'bs'}}
+        input_names = ["input_ids"]
+        output_names = ["context","pooled_output"]
+        print("开始转换clip为onnx")
+        torch.onnx.export(clip,
+                            (input_ids),
+                            "./sd_clip.onnx",
+                        export_params=True,
+                        opset_version=17,
+                        do_constant_folding=True,
+                        keep_initializers_as_inputs=True,
+                        input_names = input_names, 
+                        output_names = output_names,
+                        dynamic_axes=dynamic_axes)
+        print("clip转换完成")
+
+        os.system("trtexec --onnx=./sd_clip.onnx --saveEngine=./sd_clip_fp32.engine --builderOptimizationLevel=5")
+
+        self.trt_logger = trt.Logger(trt.Logger.WARNING) #创建logger记录
+        trt.init_libnvinfer_plugins(self.trt_logger, '') #初始化插件库
+        with open("sd_clip_fp32.plan", 'rb') as f:
+            engine_str = f.read() #读取字节1
+        clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str) #字节序列恢复为对象
+        clip_context = clip_engine.create_execution_context() #创建推理的上下文context
+        #这里加载进去context
+        self.model.cond_stage_model.clip_context = clip_context #替换模型的上下文，与engine是1对多
+        print("加载成功clip的engine")
         # """-----------------------------------------------"""
 
         """-----------------------------------------------加载controlnet的engine模型-----------------------------------------------"""
@@ -47,10 +70,9 @@ class hackathon():
         output_names = []
         for i in range(13): #这里还不知道为什么是13,但确实是13个
             output_names.append("out_"+ str(i))
-
         torch.onnx.export(control_model,               
                             (x_in, h_in, t_in, c_in),  
-                            "sd_control.onnx",   
+                            "./sd_control.onnx",   
                             export_params=True,
                             opset_version=17,
                             do_constant_folding=True,
@@ -61,11 +83,11 @@ class hackathon():
         # --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768
         print("controlnet成功转为onnx模型")
         
-        os.system("trtexec --onnx=sd_control.onnx --saveEngine=sd_control_fp16.engine --fp16  --builderOptimizationLevel=5")
+        os.system("trtexec --onnx=./sd_control.onnx --saveEngine=./sd_control_fp16.engine --fp16  --builderOptimizationLevel=5")
         
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
-        with open("sd_control_fp16.engine", 'rb') as f:
+        with open("./sd_control_fp16.engine", 'rb') as f:
             engine_str = f.read()
         control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
         control_context = control_engine.create_execution_context()
@@ -99,7 +121,7 @@ class hackathon():
         print("开始转换diffusion_model为onnx！\n")
         torch.onnx.export(diffusion_model,               
                             (x_in, time_in, context_in, control),  
-                            "sd_diffusion.onnx",   
+                            "./sd_diffusion.onnx",   
                             export_params=True,#
                             opset_version=17,
                             keep_initializers_as_inputs=True,
@@ -109,11 +131,11 @@ class hackathon():
         print("转换diffusion_model为onnx成功！")
 
         
-        os.system("trtexec --onnx=sd_diffusion.onnx --saveEngine=sd_diffusion_fp16.engine --fp16 --builderOptimizationLevel=5")
+        os.system("trtexec --onnx=./sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --builderOptimizationLevel=5")
         
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
-        with open("sd_diffusion_fp16.engine", 'rb') as f:
+        with open("./sd_diffusion_fp16.engine", 'rb') as f:
             diffusion_engine_str = f.read()
         diffusion_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(diffusion_engine_str)
         diffusion_context = diffusion_engine.create_execution_context()

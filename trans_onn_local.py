@@ -26,9 +26,9 @@ class hackathon():
         W = 384
         """----------------------------------------------转换cond_stage_model为onnx-----------------"""
         cond_stage_model = self.model.cond_stage_model
-        # self.tokenizer = cond_stage_model.tokenizer
+    
         clip = cond_stage_model.transformer #
-        # if not os.path.isfile("./models/onnxmodels/sd_clip_fp16-test-2131.onnx"):
+
         input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
         dynamic_axes = {'input_ids' : {0 : 'bs'},
                         'context' : {0 : 'bs'},
