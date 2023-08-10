@@ -367,6 +367,7 @@ class ControlLDM(LatentDiffusion):
             control = [c * scale for c, scale in zip(control_out, self.control_scales)]
             # eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
             ################################# update: diffusion trt infer ########################################
+ 
             buffer_device = []
             buffer_device.append(x_noisy.reshape(-1).data_ptr())
             buffer_device.append(t.reshape(-1).data_ptr())
@@ -376,7 +377,6 @@ class ControlLDM(LatentDiffusion):
             eps = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to("cuda")
             buffer_device.append(eps.reshape(-1).data_ptr())
             self.diffusion_context.execute_v2(buffer_device)
-
             ######################################################################################################
 
         return eps
@@ -474,25 +474,3 @@ class ControlLDM(LatentDiffusion):
             self.control_model = self.control_model.cpu()
             self.first_stage_model = self.first_stage_model.cuda()
             self.cond_stage_model = self.cond_stage_model.cuda()
-
- ################################update#######################
-    @torch.no_grad()
-    def decode_first_stage(self, z, predict_cids=False, force_not_quantize=False):
-        if predict_cids:
-            if z.dim() == 4:
-                z = torch.argmax(z.exp(), dim=1).long()
-            z = self.first_stage_model.quantize.get_codebook_entry(z, shape=None)
-            z = rearrange(z, 'b h w c -> b c h w').contiguous()
-
-        z = 1. / self.scale_factor * z
-
-        #TODO 创建engine，并且把调用self.first_stage_model.decode
-        #return 1,3,256,384
-        buffer_device = []
-        buffer_device.append(z.reshape(-1).data_ptr())
-        decode_result = torch.zeros(1,3,256,384,dtype=torch.float32).to("cuda")
-        buffer_device.append(decode_result.reshape(-1).data_ptr())
-        
-        self.vae_decode_context.execute_v2(buffer_device)
-
-        return decode_result

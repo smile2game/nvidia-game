@@ -39,11 +39,16 @@ for i in range(20):
             100, #low_threshold：Canny边缘检测的低阈值。
             200) #high_threshold：Canny边缘检测的高阈值。
     end = datetime.datetime.now().timestamp()
-    print("time cost is: ", (end-start)*1000)
+    cost = (end-start)*1000
+    print("time cost is: \n加上引擎开跑！！用时:", cost)
+    latencys.append(cost)
     new_path = "./bird_"+ str(i) + ".jpg"
     cv2.imwrite(new_path, new_img[0])
     # generate the base_img by running the pytorch fp32 pipeline (origin code in canny2image_TRT.py)
     base_path = path
     score = PD(base_path, new_path)
-    print("score is: ", score)
-
+    scores.append(score)
+    print("得到的分数是: ", score)
+print("------------\n----------时间列表为：",latencys)
+print("------------\n----------平均时间为：",np.mean(latencys))
+print("------------\n----------分数列表为：",scores)

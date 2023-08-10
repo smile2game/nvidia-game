@@ -28,6 +28,33 @@ class hackathon():
         trt.init_libnvinfer_plugins(self.trt_logger, '')
         H = 256
         W = 384
+        """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
+        if not os.path.isfile("./sd_clip_fp32.engine"):
+            cond_stage_model = self.model.cond_stage_model
+            clip = cond_stage_model.transformer #
+            input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
+            dynamic_axes = {'input_ids' : {0 : 'bs'},
+                            'context' : {0 : 'bs'},
+                            'pooled_output' : {0 : 'bs'}}
+            input_names = ["input_ids"]
+            output_names = ["context","pooled_output"]
+            print("开始转换clip为onnx")
+            torch.onnx.export(clip,
+                                (input_ids),
+                                ".sd_clip.onnx",
+                            export_params=True,
+                            opset_version=16,
+                            do_constant_folding=True,
+                            keep_initializers_as_inputs=True,
+                            input_names = input_names, 
+                            output_names = output_names,
+                            dynamic_axes=dynamic_axes)
+            os.system("trtexec --onnx=./sd_clip.onnx --saveEngine=./sd_clip_fp32.engine ")
+            print("clip转换完成")
+
+
+
+        """-----------------------------------------------加载controlnet的engine模型-----------------------------------------------"""
         if not os.path.isfile("sd_control_fp16.engine"):
             control_model = self.model.control_model 
             x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
@@ -55,8 +82,18 @@ class hackathon():
                                 input_names = ['x_in', "h_in", "t_in", "c_in"], 
                                 output_names = output_names)
                                 # dynamic_axes = dynamic_table)
-            # os.system("trtexec --onnx=sd_control_test.onnx --saveEngine=sd_control_fp16.engine --fp16 --verbose")
-   
+            os.system("trtexec --onnx=./sd_control_test.onnx --saveEngine=./sd_control_fp16.engine --fp16 --verbose --builderOptimizationLevel=5")
+                     
+        # with open("sd_control_fp16.engine", 'rb') as f:
+        #     engine_str = f.read()
+        # control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+        # control_context = control_engine.create_execution_context()
+        # # control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
+        # # control_context.set_binding_shape(1, (1, 3, H, W))
+        # # control_context.set_binding_shape(2, (1,))
+        # # control_context.set_binding_shape(3, (1, 77, 768))
+        # self.model.control_context = control_context
+        # print("finished")
 
        
 
@@ -96,11 +133,47 @@ class hackathon():
                                 output_names = output_names)
             print("转换diffusion_model为onnx成功！")
 
-            # os.system("trtexec --onnx=./sd_diffusion_test.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --verbose")
+            os.system("trtexec --onnx=./sd_diffusion_test.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --verbose --builderOptimizationLevel=5")
             
+        # with open("sd_diffusion_fp16.engine", 'rb') as f:
+        #     diffusion_engine_str = f.read()
+        # diffusion_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(diffusion_engine_str)
+        # diffusion_context = diffusion_engine.create_execution_context()
+        # self.model.diffusion_context = diffusion_context
+        # print("加载成功diffusion_model的engine")
 
-           
+
+        """------------------------添加vae的部分-----------------------"""
+        if not os.path.isfile("sd_vae_fp16-b5.engine"):
+            model = self.model.first_stage_model
+            # vae调用的是decode,而导出onnx需要forward,所以这里做一个替换即可。
+            model.forward = model.decode
+            print("开始生成vae的onnx")
+            torch.onnx.export(
+                model,
+                (torch.randn(1, 4, 32, 48, device="cuda")),
+                './sd_vae.onnx',
+                export_params=True,
+                opset_version=17,
+                do_constant_folding=True,
+                input_names=['z'],
+                output_names=['dec'],
+                dynamic_axes={'z': {0: 'B'}, 'dec': {0: 'B'}},
+            )
+            print("vae的onnx生成完成")
+            os.system("trtexec --onnx=./sd_vae.onnx --saveEngine=./sd_vae_fp16.engine --fp16 --optShapes=z:1x4x32x48 --builderOptimizationLevel=5")
+            
+        # with open("sd_vae_fp16-b5.engine", 'rb') as f:
+        #     engine_str = f.read()
+        # vae_decode_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+        # vae_decode_context = vae_decode_engine.create_execution_context()
+        # vae_decode_context.set_binding_shape(0, (1, 4, 32,48)) 
+        # self.model.vae_decode_context = vae_decode_context
+        # print("finished vae!")
         """-----------------------------------------------"""
+
+
+
 
 
         """-------------------------提前开buffer----------------------"""

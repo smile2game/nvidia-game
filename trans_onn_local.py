@@ -26,7 +26,6 @@ class hackathon():
         W = 384
         """----------------------------------------------转换cond_stage_model为onnx-----------------"""
         cond_stage_model = self.model.cond_stage_model
-    
         clip = cond_stage_model.transformer #
 
         input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
@@ -46,6 +45,7 @@ class hackathon():
                         input_names = input_names, 
                         output_names = output_names,
                         dynamic_axes=dynamic_axes)
+                        
         print("clip转换完成")
 
         # os.system("trtexec --onnx=./models/onnxmodels/sd_clip_fp32-test-1326.onnx --saveEngine=./models/enginemodels/sd_clip_fp32-test-1326.plan --workspace=1000")
