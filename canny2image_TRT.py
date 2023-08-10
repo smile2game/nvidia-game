@@ -27,38 +27,38 @@ class hackathon():
         H = 256
         W = 384
         # """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
-        cond_stage_model = self.model.cond_stage_model
-        clip = cond_stage_model.transformer #
-        input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
-        dynamic_axes = {'input_ids' : {0 : 'bs'},
-                        'context' : {0 : 'bs'},
-                        'pooled_output' : {0 : 'bs'}}
-        input_names = ["input_ids"]
-        output_names = ["context","pooled_output"]
-        print("开始转换clip为onnx")
-        torch.onnx.export(clip,
-                            (input_ids),
-                            "./sd_clip.onnx",
-                        export_params=True,
-                        opset_version=17,
-                        do_constant_folding=True,
-                        keep_initializers_as_inputs=True,
-                        input_names = input_names, 
-                        output_names = output_names,
-                        dynamic_axes=dynamic_axes)
-        print("clip转换完成")
+        # cond_stage_model = self.model.cond_stage_model
+        # clip = cond_stage_model.transformer #
+        # input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
+        # dynamic_axes = {'input_ids' : {0 : 'bs'},
+        #                 'context' : {0 : 'bs'},
+        #                 'pooled_output' : {0 : 'bs'}}
+        # input_names = ["input_ids"]
+        # output_names = ["context","pooled_output"]
+        # print("开始转换clip为onnx")
+        # torch.onnx.export(clip,
+        #                     (input_ids),
+        #                     "./sd_clip.onnx",
+        #                 export_params=True,
+        #                 opset_version=16,
+        #                 do_constant_folding=True,
+        #                 keep_initializers_as_inputs=True,
+        #                 input_names = input_names, 
+        #                 output_names = output_names,
+        #                 dynamic_axes=dynamic_axes)
+        # print("clip转换完成")
 
-        os.system("trtexec --onnx=./sd_clip.onnx --saveEngine=./sd_clip_fp32.plan --builderOptimizationLevel=5")
+        # os.system("trtexec --onnx=./sd_clip.onnx --saveEngine=./sd_clip_fp32.plan --builderOptimizationLevel=5")
 
-        self.trt_logger = trt.Logger(trt.Logger.WARNING) #创建logger记录
-        trt.init_libnvinfer_plugins(self.trt_logger, '') #初始化插件库
-        with open("./sd_clip_fp32.plan", 'rb') as f:
-            engine_str = f.read() #读取字节1
-        clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str) #字节序列恢复为对象
-        clip_context = clip_engine.create_execution_context() #创建推理的上下文context
-        #这里加载进去context
-        self.model.cond_stage_model.clip_context = clip_context #替换模型的上下文，与engine是1对多
-        print("加载成功clip的engine")
+        # self.trt_logger = trt.Logger(trt.Logger.WARNING) #创建logger记录
+        # trt.init_libnvinfer_plugins(self.trt_logger, '') #初始化插件库
+        # with open("./sd_clip_fp32.plan", 'rb') as f:
+        #     engine_str = f.read() #读取字节1
+        # clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str) #字节序列恢复为对象
+        # clip_context = clip_engine.create_execution_context() #创建推理的上下文context
+        # #这里加载进去context
+        # self.model.cond_stage_model.clip_context = clip_context #替换模型的上下文，与engine是1对多
+        # print("加载成功clip的engine")
         # """-----------------------------------------------"""
 
         """-----------------------------------------------加载controlnet的engine模型-----------------------------------------------"""
@@ -74,7 +74,7 @@ class hackathon():
                             (x_in, h_in, t_in, c_in),  
                             "./sd_control.onnx",   
                             export_params=True,
-                            opset_version=17,
+                            opset_version=16,
                             do_constant_folding=True,
                             keep_initializers_as_inputs=True,
                             input_names = ['x_in', "h_in", "t_in", "c_in"], 
@@ -129,7 +129,7 @@ class hackathon():
                             (x_in, time_in, context_in, control),  
                             "./sd_diffusion.onnx",   
                             export_params=True,#
-                            opset_version=17,
+                            opset_version=16,
                             keep_initializers_as_inputs=True,
                             do_constant_folding=True,
                             input_names =input_names, 
