@@ -39,6 +39,30 @@ class hackathon():
         # """-----------------------------------------------"""
 
         """-----------------------------------------------加载controlnet的engine模型-----------------------------------------------"""
+        control_model = self.model.control_model
+        x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
+        h_in = torch.randn(1, 3, H, W, dtype=torch.float32).to("cuda")
+        t_in = torch.zeros(1, dtype=torch.int64).to("cuda")
+        c_in = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
+        output_names = []
+        for i in range(13): #这里还不知道为什么是13,但确实是13个
+            output_names.append("out_"+ str(i))
+
+        torch.onnx.export(control_model,               
+                            (x_in, h_in, t_in, c_in),  
+                            "sd_control.onnx",   
+                            export_params=True,
+                            opset_version=17,
+                            do_constant_folding=True,
+                            keep_initializers_as_inputs=True,
+                            input_names = ['x_in', "h_in", "t_in", "c_in"], 
+                            output_names = output_names)
+                            # dynamic_axes = dynamic_table)
+        # --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768
+        print("controlnet成功转为onnx模型")
+        
+        os.system("trtexec --onnx=sd_control.onnx --saveEngine=sd_control_fp16.engine --fp16  --builderOptimizationLevel=5")
+        
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
         with open("sd_control_fp16.engine", 'rb') as f:
@@ -50,6 +74,43 @@ class hackathon():
         """-----------------------------------------------"""
 
         """-----------------------------------------------加载unet的engine模型-----------------------------------------------"""
+        diffusion_model = self.model.model.diffusion_model #找对了
+        print("转换diffusion_model为onnx模型")
+        x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
+        time_in = torch.zeros(1, dtype=torch.int64).to("cuda")
+        context_in = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
+        control = []
+        control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        input_names = ["x_in", "time_in", "context_in","crotrol"]
+        output_names = ["out_h"]
+
+        print("开始转换diffusion_model为onnx！\n")
+        torch.onnx.export(diffusion_model,               
+                            (x_in, time_in, context_in, control),  
+                            "sd_diffusion.onnx",   
+                            export_params=True,#
+                            opset_version=17,
+                            keep_initializers_as_inputs=True,
+                            do_constant_folding=True,
+                            input_names =input_names, 
+                            output_names = output_names)
+        print("转换diffusion_model为onnx成功！")
+
+        
+        os.system("trtexec --onnx=sd_diffusion.onnx --saveEngine=sd_diffusion_fp16.engine --fp16 --builderOptimizationLevel=5")
+        
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
         with open("sd_diffusion_fp16.engine", 'rb') as f:
