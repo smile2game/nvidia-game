@@ -42,7 +42,7 @@ for i in range(20):
     cost = (end-start)*1000
     print("time cost is: \n加上引擎开跑！！用时:", cost)
     latencys.append(cost)
-    new_path = "./bird_"+ str(i) + ".jpg"
+    new_path = "./pics_bird/bird_"+ str(i) + ".jpg"
     cv2.imwrite(new_path, new_img[0])
     # generate the base_img by running the pytorch fp32 pipeline (origin code in canny2image_TRT.py)
     base_path = path

@@ -187,10 +187,8 @@ class DDIMSampler(object):
         if unconditional_conditioning is None or unconditional_guidance_scale == 1.:
             model_output = self.model.apply_model(x, t, c)
         else:
-            model = self.model.apply_model(x, t, c,unconditional_conditioning)
-            model_t = model[0]
-            model_uncond = model[1]
-            # model_uncond = self.model.apply_model(x, t, unconditional_conditioning)
+            model_t = self.model.apply_model(x, t, c)
+            model_uncond = self.model.apply_model(x, t, unconditional_conditioning)
             model_output = model_uncond + unconditional_guidance_scale * (model_t - model_uncond)
 
         if self.model.parameterization == "v":

@@ -3,8 +3,6 @@ import torch
 import torch as th
 import torch.nn as nn
 import datetime
-import os
-# os.environ['CUDA_MODULE_LOADING'] = 'LAZY'  #不要用，效果不好
 
 from ldm.modules.diffusionmodules.util import (
     conv_nd,
@@ -348,51 +346,49 @@ class ControlLDM(LatentDiffusion):
             pass
         else:
             """这里参考 代码 更改"""
-            # start = datetime.datetime.now().timestamp()
-            # control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_txt)
-            # end = datetime.datetime.now().timestamp()
-            # print("\ncontrolnet消耗时间为：",(end - start)*1000 )
-            # control = [c * scale for c, scale in zip(control, self.control_scales)] 
-            # #没有用
+            start = datetime.datetime.now().timestamp()
+            control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_txt)
+            end = datetime.datetime.now().timestamp()
+            print("\ncontrolnet消耗时间为：",(end - start)*1000 )
+            
+            control = [c * scale for c, scale in zip(control, self.control_scales)]
 
             hint_in = torch.cat(cond['c_concat'], 1)
             hint_in = torch.cat([hint_in,hint_in], 0)
 
             # b, c, h, w = x_noisy.shape
 
-            buffer_device = []
-            buffer_device.append(x_noisy.reshape(-1).data_ptr())
-            buffer_device.append(hint_in.reshape(-1).data_ptr())
-            buffer_device.append(t.reshape(-1).data_ptr())
-            buffer_device.append(cond_txt.reshape(-1).data_ptr())
+            # buffer_device = []
+            # buffer_device.append(x_noisy.reshape(-1).data_ptr())
+            # buffer_device.append(hint_in.reshape(-1).data_ptr())
+            # buffer_device.append(t.reshape(-1).data_ptr())
+            # buffer_device.append(cond_txt.reshape(-1).data_ptr())
 
-            control_out = []  #这里可以不用
-            for i in range(13):
-                control_out.append(self.control_out[i])
-                buffer_device.append(self.control_out[i].reshape(-1).data_ptr())
+            # control_out = []  #这里可以不用
+            # for i in range(13):
+            #     control_out.append(self.control_out[i])
+            #     buffer_device.append(self.control_out[i].reshape(-1).data_ptr())
 
-            self.control_context.execute_v2(buffer_device)
+            # self.control_context.execute_v2(buffer_device)
 
-            control = [c * scale for c, scale in zip(control_out, self.control_scales)]
-
+            # control = [c * scale for c, scale in zip(control_out, self.control_scales)]
+            start = datetime.datetime.now().timestamp()
+            eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
+            end = datetime.datetime.now().timestamp()
+            print("\ndiffusion消耗时间为：", (end - start)*1000 )
            
             ################################# update: diffusion trt infer ########################################
-            # start = datetime.datetime.now().timestamp()
-            # eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
-            # end = datetime.datetime.now().timestamp()
-            # print("\ndiffusion消耗时间为：", (end - start)*1000 )
-           
-            
-            buffer_device = []
-            buffer_device.append(x_noisy.reshape(-1).data_ptr())
-            buffer_device.append(t.reshape(-1).data_ptr())
-            buffer_device.append(cond_txt.reshape(-1).data_ptr())
-            for temp in control:
-                buffer_device.append(temp.reshape(-1).data_ptr())
-            eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
-            buffer_device.append(eps.reshape(-1).data_ptr())
-            self.diffusion_context.execute_v2(buffer_device)
+            # buffer_device = []
+            # buffer_device.append(x_noisy.reshape(-1).data_ptr())
+            # buffer_device.append(t.reshape(-1).data_ptr())
+            # buffer_device.append(cond_txt.reshape(-1).data_ptr())
+            # for temp in control:
+            #     buffer_device.append(temp.reshape(-1).data_ptr())
+            # eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+            # buffer_device.append(eps.reshape(-1).data_ptr())
+            # self.diffusion_context.execute_v2(buffer_device)
             ######################################################################################################
+
         return eps
 
     @torch.no_grad()

@@ -1,0 +1,1 @@
+trtexec --onnx=./sd_control.onnx  --saveEngine=./sd_control_fp16.engine --fp16 --verbose  --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768  --minShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768  --maxShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768  --builderOptimizationLevel=5

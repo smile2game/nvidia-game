@@ -31,59 +31,58 @@ class hackathon():
         H = 256
         W = 384
         """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
-        # if not os.path.isfile("sd_clip_fp32.engine"):
-        #     cond_stage_model = self.model.cond_stage_model
-        #     clip = cond_stage_model.transformer #
-        #     input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
-        #     dynamic_axes = {'input_ids' : {0 : 'bs'},
-        #                     'context' : {0 : 'bs'},
-        #                     'pooled_output' : {0 : 'bs'}}
-        #     input_names = ["input_ids"]
-        #     output_names = ["context","pooled_output"]
-        #     print("开始转换clip为onnx")
-        #     torch.onnx.export(clip,
-        #                         (input_ids),
-        #                         "./sd_clip.onnx",
-        #                     export_params=True,
-        #                     opset_version=16,
-        #                     do_constant_folding=True,
-        #                     keep_initializers_as_inputs=True,
-        #                     input_names = input_names, 
-        #                     output_names = output_names,
-        #                     dynamic_axes=dynamic_axes)
-        #     os.system("trtexec --onnx=./sd_clip.onnx --saveEngine=./sd_clip_fp32.engine  --optShapes=input_ids:1x77  --minShapes=input_ids:1x77  --maxShapes=input_ids:1x77  --builderOptimizationLevel=5")
-        #     print("clip转换完成")
+        if not os.path.isfile("sd_clip_fp32.engine"):
+            cond_stage_model = self.model.cond_stage_model
+            clip = cond_stage_model.transformer #
+            input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
+            dynamic_axes = {'input_ids' : {0 : 'bs'},
+                            'context' : {0 : 'bs'},
+                            'pooled_output' : {0 : 'bs'}}
+            input_names = ["input_ids"]
+            output_names = ["context","pooled_output"]
+            print("开始转换clip为onnx")
+            torch.onnx.export(clip,
+                                (input_ids),
+                                "./sd_clip.onnx",
+                            export_params=True,
+                            opset_version=16,
+                            do_constant_folding=True,
+                            keep_initializers_as_inputs=True,
+                            input_names = input_names, 
+                            output_names = output_names,
+                            dynamic_axes=dynamic_axes)
+            os.system("trtexec --onnx=./sd_clip.onnx --saveEngine=./sd_clip_fp32.engine  --optShapes=input_ids:1x77  --minShapes=input_ids:1x77  --maxShapes=input_ids:1x77  --builderOptimizationLevel=5")
+            print("clip转换完成")
 
-        # with open("./sd_clip_fp32.engine", 'rb') as f:
-        #     engine_str = f.read() #读取字节1
-        # clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str) #字节序列恢复为对象
-        # clip_context = clip_engine.create_execution_context() #创建推理的上下文context
+        with open("./sd_clip_fp32.engine", 'rb') as f:
+            engine_str = f.read() #读取字节1
+        clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str) #字节序列恢复为对象
+        clip_context = clip_engine.create_execution_context() #创建推理的上下文context
        
-        # #这里set_binding_shape是为了设置输入的shape，因为我们的输入是动态的，所以需要设置
-        # clip_context.set_binding_shape(0, (1, 77)) #这里设置输入的shape，因为我们的输入是动态的，所以需要设置
-        # #这里加载进去context
-        # self.model.cond_stage_model.clip_context = clip_context #替换模型的上下文，与engine是1对多
-        # print("加载成功clip的engine")
+        #这里set_binding_shape是为了设置输入的shape，因为我们的输入是动态的，所以需要设置
+        clip_context.set_binding_shape(0, (1, 77)) #这里设置输入的shape，因为我们的输入是动态的，所以需要设置
+        #这里加载进去context
+        self.model.cond_stage_model.clip_context = clip_context #替换模型的上下文，与engine是1对多
+        print("加载成功clip的engine")
 
         """---------------------------加载controlnet--------------------"""
         if not os.path.isfile("sd_control_fp16.engine"):
             control_model = self.model.control_model 
-            x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
-            h_in = torch.randn(2, 3, H, W, dtype=torch.float32).to("cuda")
-            t_in = torch.zeros(2, dtype=torch.int64).to("cuda")
-            c_in = torch.randn(2, 77, 768, dtype=torch.float32).to("cuda")
+            x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
+            h_in = torch.randn(1, 3, H, W, dtype=torch.float32).to("cuda")
+            t_in = torch.zeros(1, dtype=torch.int64).to("cuda")
+            c_in = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
             # controls = control_model(x=x_in, hint=h_in, timesteps=t_in, context=c_in)
             output_names = []
             for i in range(13):
                 output_names.append("out_"+ str(i))
-
-            dynamic_table = {'x_in' : {0 : 'bs'}, 
-                                'h_in' : {0 : 'bs'}, 
+            dynamic_table = {'x_in' : {0 : 'bs', 2 : 'H', 3 : 'W'}, 
+                                'h_in' : {0 : 'bs', 2 : '8H', 3 : '8W'}, 
                                 't_in' : {0 : 'bs'},
                                 'c_in' : {0 : 'bs'}}
+
             for i in range(13):
                 dynamic_table[output_names[i]] = {0 : "bs"}
-
             torch.onnx.export(control_model,               
                                 (x_in, h_in, t_in, c_in),  
                                 "./sd_control.onnx",   
@@ -95,41 +94,42 @@ class hackathon():
                                 output_names = output_names,
                                 dynamic_axes = dynamic_table)
 
-            os.system("trtexec --onnx=./sd_control.onnx --saveEngine=./sd_control_fp16.engine --fp16 --verbose --optShapes=x_in:2x4x32x48,h_in:2x3x256x384,t_in:2,c_in:2x77x768  --minShapes=x_in:2x4x32x48,h_in:2x3x256x384,t_in:2,c_in:2x77x768  --maxShapes=x_in:2x4x32x48,h_in:2x3x256x384,t_in:2,c_in:2x77x768  --builderOptimizationLevel=3")
+            os.system("trtexec --onnx=./sd_control.onnx --saveEngine=./sd_control_fp16.engine --fp16 --verbose --optShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768  --minShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768  --maxShapes=x_in:1x4x32x48,h_in:1x3x256x384,t_in:1,c_in:1x77x768  --builderOptimizationLevel=3")
             #自带cuda graph
 
         with open("./sd_control_fp16.engine", 'rb') as f:
             engine_str = f.read()
         control_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
         control_context = control_engine.create_execution_context()
-        control_context.set_binding_shape(0, (2, 4, H // 8, W // 8))
-        control_context.set_binding_shape(1, (2, 3, H, W))
-        control_context.set_binding_shape(2, (2,))
-        control_context.set_binding_shape(3, (2, 77, 768))
+        control_context.set_binding_shape(0, (1, 4, H // 8, W // 8))
+        control_context.set_binding_shape(1, (1, 3, H, W))
+        control_context.set_binding_shape(2, (1,))
+        control_context.set_binding_shape(3, (1, 77, 768))
         self.model.control_context = control_context
         print("\ncontrolnet成功启用")
+
 
         """-----------------------------------------------加载unet的engine模型-----------------------------------------------"""
         if not os.path.isfile("sd_diffusion_fp16.engine"):
             diffusion_model = self.model.model.diffusion_model #找对了
             print("转换diffusion_model为onnx模型")
-            x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
-            time_in = torch.zeros(2, dtype=torch.int64).to("cuda")
-            context_in = torch.randn(2, 77, 768, dtype=torch.float32).to("cuda")
+            x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
+            time_in = torch.zeros(1, dtype=torch.int64).to("cuda")
+            context_in = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
             control = []
-            control.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-            control.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+            control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
 
             input_names = ["x_in", "time_in", "context_in"]
             for i in range(13):
@@ -139,6 +139,8 @@ class hackathon():
             dynamic_table = {'x_in' : {0 : 'bs', 2 : 'H', 3 : 'W'}, 
                                 'time_in' : {0 : 'bs'},
                                 'context_in' : {0 : 'bs'}}
+ 
+
             for i in range(3,15):
                     dynamic_table[input_names[i]] = {0 : "bs"}
 
@@ -146,19 +148,16 @@ class hackathon():
             print("开始转换diffusion_model为onnx！\n")
             torch.onnx.export(diffusion_model,               
                                 (x_in, time_in, context_in, control),  
-                                "./sd_diffusion.onnx",   
+                                "./ooo/sd_diffusion.onnx",   
                                 export_params=True,#
                                 opset_version=16,
                                 keep_initializers_as_inputs=True,
                                 do_constant_folding=True,
                                 input_names =input_names, 
                                 output_names = output_names)
-            
-            #dynamic
-
             print("转换diffusion_model为onnx成功！")
 
-            os.system("trtexec --onnx=./sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --verbose --builderOptimizationLevel=3")
+            os.system("trtexec --onnx=./ooo/sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --verbose --builderOptimizationLevel=3")
             #level = 4 会 killed; level = 5 会 segment default
 
         with open("sd_diffusion_fp16.engine", 'rb') as f:
@@ -166,25 +165,28 @@ class hackathon():
         diffusion_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(diffusion_engine_str)
         diffusion_context = diffusion_engine.create_execution_context()
 
-        diffusion_context.set_binding_shape(0, (2, 4, H//8, W //8))
-        diffusion_context.set_binding_shape(1, (2,))
-        diffusion_context.set_binding_shape(2, (2, 77,768))
+        diffusion_context.set_binding_shape(0, (1, 4, H//8, W //8))
+        diffusion_context.set_binding_shape(1, (1,))
+        diffusion_context.set_binding_shape(2, (1, 77,768))
 
-        diffusion_context.set_binding_shape(3, (2, 320, H//8, W //8))
-        diffusion_context.set_binding_shape(4, (2, 320, H//8, W //8))
-        diffusion_context.set_binding_shape(5, (2, 320, H//8, W //8))
+        diffusion_context.set_binding_shape(3, (1, 320, H//8, W //8))
+        diffusion_context.set_binding_shape(4, (1, 320, H//8, W //8))
+        diffusion_context.set_binding_shape(5, (1, 320, H//8, W //8))
 
-        diffusion_context.set_binding_shape(6, (2, 320, H//16, W //16))
-        diffusion_context.set_binding_shape(7, (2, 640, H//16, W //16))
-        diffusion_context.set_binding_shape(8, (2, 640, H//16, W //16))
-        diffusion_context.set_binding_shape(9, (2, 640, H//32, W //32))
+        diffusion_context.set_binding_shape(6, (1, 320, H//16, W //16))
+        diffusion_context.set_binding_shape(7, (1, 640, H//16, W //16))
+        diffusion_context.set_binding_shape(8, (1, 640, H//16, W //16))
+        diffusion_context.set_binding_shape(9, (1, 640, H//32, W //32))
 
-        diffusion_context.set_binding_shape(10, (2,1280, H//32, W //32))
-        diffusion_context.set_binding_shape(11, (2,1280, H//32, W //32))
-        diffusion_context.set_binding_shape(12, (2,1280, H//64, W //64))
-        diffusion_context.set_binding_shape(13, (2,1280, H//64, W //64))
-        diffusion_context.set_binding_shape(14, (2,1280, H//64, W //64))
-        diffusion_context.set_binding_shape(15, (2,1280, H//64, W //64))
+        diffusion_context.set_binding_shape(10, (1280, H//32, W //32))
+        diffusion_context.set_binding_shape(11, (1280, H//32, W //32))
+        diffusion_context.set_binding_shape(12, (1280, H//64, W //64))
+        diffusion_context.set_binding_shape(13, (1280, H//64, W //64))
+        diffusion_context.set_binding_shape(14, (1280, H//64, W //64))
+        diffusion_context.set_binding_shape(15, (1280, H//64, W //64))
+ 
+      
+
         self.model.diffusion_context = diffusion_context
         print("加载成功diffusion_model的engine")
         """----------------------------------------------------------------------------------------------"""
@@ -223,21 +225,20 @@ class hackathon():
         #unet: 3 + 13 -> 1
         #总共：4 +13 +3+1=21
         self.model.control_out = []
-
-        self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.model.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+        self.model.control_out.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.model.eps = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to("cuda")
         """-----------------------------------------------"""
 
 
@@ -268,7 +269,6 @@ class hackathon():
                 self.model.low_vram_shift(is_diffusing=True)
             ddim_steps = 10
             self.model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
-            
             samples, intermediates = self.ddim_sampler.sample(ddim_steps, num_samples,
                                                         shape, cond, verbose=False, eta=eta,
                                                         unconditional_guidance_scale=scale,

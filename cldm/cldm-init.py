@@ -2,9 +2,6 @@ import einops
 import torch
 import torch as th
 import torch.nn as nn
-import datetime
-import os
-# os.environ['CUDA_MODULE_LOADING'] = 'LAZY'  #不要用，效果不好
 
 from ldm.modules.diffusionmodules.util import (
     conv_nd,
@@ -329,34 +326,32 @@ class ControlLDM(LatentDiffusion):
         control = control.to(memory_format=torch.contiguous_format).float()
         return x, dict(c_crossattn=[c], c_concat=[control])
 
-    def apply_model(self, x_noisy, t, cond,unconditional_conditioning,*args, **kwargs):
+    def apply_model(self, x_noisy, t, cond,unconditional_conditioning=None,*args, **kwargs):
         assert isinstance(cond, dict)
         diffusion_model = self.model.diffusion_model
 
-        "--------------------------------数据 拼接x2-------------------------------"
         x_noisy = torch.cat([x_noisy, x_noisy], 0)
         #将t类型改为int32
         t = t.to(torch.int32)
         t = torch.cat([t, t], 0)
 
+
         cond_txt = torch.cat(cond['c_crossattn'], 1)
         cond_uncon = torch.cat(unconditional_conditioning['c_crossattn'], 1)
+        
         cond_txt  = torch.cat([cond_txt, cond_uncon], 0) #将 cond_txt 和 cont_uncon 拼接起来
-        "---------------------------------------------------------------"
+
 
         if cond['c_concat'] is None:
             pass
         else:
             """这里参考 代码 更改"""
-            # start = datetime.datetime.now().timestamp()
             # control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_txt)
-            # end = datetime.datetime.now().timestamp()
-            # print("\ncontrolnet消耗时间为：",(end - start)*1000 )
-            # control = [c * scale for c, scale in zip(control, self.control_scales)] 
-            # #没有用
-
+            # control = [c * scale for c, scale in zip(control, self.control_scales)]
             hint_in = torch.cat(cond['c_concat'], 1)
-            hint_in = torch.cat([hint_in,hint_in], 0)
+            hint_in2 = torch.cat(cond['c_concat'], 1)
+
+            hint_in = torch.cat([hint_in,hint_in2], 0)
 
             # b, c, h, w = x_noisy.shape
 
@@ -372,17 +367,9 @@ class ControlLDM(LatentDiffusion):
                 buffer_device.append(self.control_out[i].reshape(-1).data_ptr())
 
             self.control_context.execute_v2(buffer_device)
-
             control = [c * scale for c, scale in zip(control_out, self.control_scales)]
-
-           
-            ################################# update: diffusion trt infer ########################################
-            # start = datetime.datetime.now().timestamp()
             # eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
-            # end = datetime.datetime.now().timestamp()
-            # print("\ndiffusion消耗时间为：", (end - start)*1000 )
-           
-            
+            ################################# update: diffusion trt infer ########################################
             buffer_device = []
             buffer_device.append(x_noisy.reshape(-1).data_ptr())
             buffer_device.append(t.reshape(-1).data_ptr())
@@ -392,7 +379,9 @@ class ControlLDM(LatentDiffusion):
             eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
             buffer_device.append(eps.reshape(-1).data_ptr())
             self.diffusion_context.execute_v2(buffer_device)
+
             ######################################################################################################
+
         return eps
 
     @torch.no_grad()
