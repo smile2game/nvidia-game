@@ -266,7 +266,7 @@ class hackathon():
 
             if config.save_memory:
                 self.model.low_vram_shift(is_diffusing=True)
-            ddim_steps = 8  #当小于6的时候，图像会发生质变
+            ddim_steps = 6  #当小于6的时候，图像会发生质变
             self.model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
             
             samples, intermediates = self.ddim_sampler.sample(ddim_steps, num_samples,

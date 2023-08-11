@@ -1,4 +1,4 @@
-import datetime
+# import datetime
 import torch
 import numpy as np
 import torch.nn as nn
@@ -124,10 +124,10 @@ class FrozenCLIPEmbedder(AbstractEncoder):
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
         tokens = batch_encoding["input_ids"].to(self.device).to(torch.int32)
 
-        start = datetime.datetime.now().timestamp()
+        # start = datetime.datetime.now().timestamp()
         context = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")["last_hidden_state"]  #这里是真的有大问题
-        end = datetime.datetime.now().timestamp()
-        print("\nclip消耗时间为：", (end - start)*1000 )
+        # end = datetime.datetime.now().timestamp()
+        # print("\nclip消耗时间为：", (end - start)*1000 )
         
         # outputs = self.transformer(input_ids=tokens)
         # if self.layer == "last":  #这一条最后是要走的路

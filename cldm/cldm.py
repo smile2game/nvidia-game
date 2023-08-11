@@ -2,8 +2,8 @@ import einops
 import torch
 import torch as th
 import torch.nn as nn
-import datetime
-import os
+# import datetime
+# import os
 # os.environ['CUDA_MODULE_LOADING'] = 'LAZY'  #不要用，效果不好
 
 from ldm.modules.diffusionmodules.util import (
