@@ -123,6 +123,7 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
         tokens = batch_encoding["input_ids"].to(self.device).to(torch.int32)
+
         start = datetime.datetime.now().timestamp()
         context = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")["last_hidden_state"]  #这里是真的有大问题
         end = datetime.datetime.now().timestamp()
@@ -147,8 +148,6 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         # end = datetime.datetime.now().timestamp()
         # print("\nclip消耗时间为：", (end - start)*1000 )
         #######################################################################################################
-        # outputs = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
-        #return outputs['last_hidden_state']
         return context
 
     def encode(self, text):

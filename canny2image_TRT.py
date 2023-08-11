@@ -88,7 +88,7 @@ class hackathon():
                                 (x_in, h_in, t_in, c_in),  
                                 "./sd_control.onnx",   
                                 export_params=True,
-                                opset_version=16,
+                                opset_version=17,
                                 do_constant_folding=True,
                                 keep_initializers_as_inputs=True,
                                 input_names = ['x_in', "h_in", "t_in", "c_in"], 
@@ -148,7 +148,7 @@ class hackathon():
                                 (x_in, time_in, context_in, control),  
                                 "./sd_diffusion.onnx",   
                                 export_params=True,#
-                                opset_version=16,
+                                opset_version=17,
                                 keep_initializers_as_inputs=True,
                                 do_constant_folding=True,
                                 input_names =input_names, 
@@ -266,7 +266,7 @@ class hackathon():
 
             if config.save_memory:
                 self.model.low_vram_shift(is_diffusing=True)
-            ddim_steps = 10
+            ddim_steps = 8  #当小于6的时候，图像会发生质变
             self.model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
             
             samples, intermediates = self.ddim_sampler.sample(ddim_steps, num_samples,
