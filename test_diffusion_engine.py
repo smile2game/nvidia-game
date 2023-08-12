@@ -11,91 +11,100 @@ os.environ['CUDA_MODULE_LOADING'] = 'LAZY'
 H = 256
 W = 384
 
-control_trt = "./models/enginemodels/sd_control_fp16.engine"
-diffusion_trt = "./models/enginemodels/sd_diffusion_fp16.engine"
+diffusion_trt = "./1-engine_b2/sd_diffusion_fp16.engine"
 
 class hackathon():
     def initialize(self):
-        self.logger = trt.Logger(trt.Logger.VERBOSE)  
+        self.logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.logger, '')
-        ####################
-        with open(control_trt, "rb") as f:
-            engineString = f.read()
-        #生成推理引擎)``
-        self.control_engine = trt.Runtime(self.logger).deserialize_cuda_engine(engineString)              
-        self.control_context = self.control_engine.create_execution_context()
-        #################
+     ########################################################
         with open(diffusion_trt, "rb") as f:
                 engineString = f.read()
         #生成推理引擎)
-        self.diffusion_engine = trt.Runtime(self.logger).deserialize_cuda_engine(engineString)              
-        self.diffusion_context = self.diffusion_engine.create_execution_context()
+        diffusion_engine = trt.Runtime(self.logger).deserialize_cuda_engine(engineString)              
+        self.diffusion_context = diffusion_engine.create_execution_context()
+        # self.diffusion_context.set_binding_shape(0, (2, 4, H//8, W //8))
+        # self.diffusion_context.set_binding_shape(1, (2,))
+        # self.diffusion_context.set_binding_shape(2, (2, 77,768))
+
+        # self.diffusion_context.set_binding_shape(3, (2, 320, H//8, W //8))
+        # self.diffusion_context.set_binding_shape(4, (2, 320, H//8, W //8))
+        # self.diffusion_context.set_binding_shape(5, (2, 320, H//8, W //8))
+
+        # self.diffusion_context.set_binding_shape(6, (2, 320, H//16, W //16))
+        # self.diffusion_context.set_binding_shape(7, (2, 640, H//16, W //16))
+        # self.diffusion_context.set_binding_shape(8, (2, 640, H//16, W //16))
+        # self.diffusion_context.set_binding_shape(9, (2, 640, H//32, W //32))
+
+        # self.diffusion_context.set_binding_shape(10, (2,1280, H//32, W //32))
+        # self.diffusion_context.set_binding_shape(11, (2,1280, H//32, W //32))
+        # self.diffusion_context.set_binding_shape(12, (2,1280, H//64, W //64))
+        # self.diffusion_context.set_binding_shape(13, (2,1280, H//64, W //64))
+        # self.diffusion_context.set_binding_shape(14, (2,1280, H//64, W //64))
+        # self.diffusion_context.set_binding_shape(15, (2,1280, H//64, W //64))
         
+        diffusion_nIO = diffusion_engine.num_io_tensors
+        diffusion_tensor_name = [diffusion_engine.get_tensor_name(i) for i in range(diffusion_nIO)]
         ############################创建输入输出buffer
         start = datetime.datetime.now().timestamp()
-        self.buffer_device = []
-        b, c, h, w = 1,4,H//8,W//8
-        self.control_out = []
-        self.control_out.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.control_out.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+
+        self.x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
+        self.time_in = torch.zeros(2, dtype=torch.int32).to("cuda")
+        self.context_in = torch.randn(2, 77, 768, dtype=torch.float32).to("cuda")
+        self.control = []
+        self.control.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.control.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+
+        #buffer处理
+        buffer_device = []
+        buffer_device.append(self.x_in.reshape(-1).data_ptr())
+        buffer_device.append(self.time_in.reshape(-1).data_ptr())
+        buffer_device.append(self.context_in.reshape(-1).data_ptr())
+        for temp in self.control:
+            buffer_device.append(temp.reshape(-1).data_ptr())
+        self.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+        buffer_device.append(self.eps.reshape(-1).data_ptr())
+
+        #创流 开捕
+        for i in range(diffusion_nIO):
+            self.diffusion_context.set_tensor_address(diffusion_tensor_name[i], buffer_device[i])
+        self.diffusion_context.execute_async_v3(diffusion_engine)
+        cudart.cudaStreamSynchronize(diffusion_stream)
+
+        _, diffusion_stream = cudart.cudaStreamCreate()
+        cudart.cudaStreamBeginCapture(diffusion_stream, cudart.cudaStreamCaptureMode.cudaStreamCaptureModeGlobal)
+        for i in range(diffusion_nIO):
+            self.diffusion_context.set_tensor_address(diffusion_tensor_name[i], buffer_device[i])
+        self.diffusion_context.execute_async_v3(diffusion_engine)
+        cudart.cudaStreamSynchronize(diffusion_stream)
         
-        self.buffer_device_diffsuion = []
-        self.eps = torch.zeros(1, 4, 32, 48, dtype=torch.float32).to("cuda")
-        self.buffer_device.append(self.eps.reshape(-1).data_ptr())
+        
+        #结束捕获
+        # _, graph = cudart.cudaStreamEndCapture(diffusion_stream)
+        # _, graphExe = cudart.cudaGraphInstantiate(graph, 0)
         end = datetime.datetime.now().timestamp()
         print("\n通过initialize节约的时间为:",(end-start)*1000)
 
+      
+
+
     def process(self):
-        ###################################
-        x_noisy = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
-        hint_in = torch.randn(1, 3, H, W, dtype=torch.float32).to("cuda")
-        t = torch.zeros(1, dtype=torch.int64).to("cuda")
-        cond_txt = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
-        self.buffer_device.append(x_noisy.reshape(-1).data_ptr())
-        self.buffer_device.append(hint_in.reshape(-1).data_ptr())
-        self.buffer_device.append(t.reshape(-1).data_ptr())
-        self.buffer_device.append(cond_txt.reshape(-1).data_ptr())
-        #execute
-        self.control_context.execute_v2(self.buffer_device)
-        ###################################
-        self.x_in = torch.randn(1, 4, H//8, W //8, dtype=torch.float32).to("cuda")
-        self.time_in = torch.zeros(1, dtype=torch.int64).to("cuda")
-        self.context_in = torch.randn(1, 77, 768, dtype=torch.float32).to("cuda")
-        self.control = []
-        self.control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.control.append(torch.randn(1, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        
-        self.buffer_device.append(self.x_in.reshape(-1).data_ptr())
-        
-        self.buffer_device.append(self.context_in.reshape(-1).data_ptr())
-        self.buffer_device.append(self.time_in.reshape(-1).data_ptr())
-        for temp in self.control:
-            self.buffer_device.append(temp.reshape(-1).data_ptr())
-        
-        #execute
-        self.diffusion_context.execute_v2(self.buffer_device)
+        ###################################        
+        # _, diffusion_stream = cudart.cudaStreamCreate()
+        # #execute
+        # self.diffusion_context.execute_async_v3(diffusion_stream)
+        self.diffusion_context.execute_async_v3(0)
         return self.eps
     
 if __name__ == "__main__":
@@ -103,10 +112,10 @@ if __name__ == "__main__":
     h = hackathon()
     h.initialize()
     start = datetime.datetime.now().timestamp()
-    h.process()
+    res = h.process()
     end = datetime.datetime.now().timestamp()
     times.append((end - start)*1000)
     # print("\ncontrolnet的输出为：",h.control_out)
-    print("\ndiffusion的输出为：",h.eps)
+    print("\ndiffusion的输出为：",res)
     print("\n执行process流程,消耗时间为：", times)
         

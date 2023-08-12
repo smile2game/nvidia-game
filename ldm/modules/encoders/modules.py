@@ -3,6 +3,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 from torch.utils.checkpoint import checkpoint
+import datetime
 
 from transformers import T5Tokenizer, T5EncoderModel, CLIPTokenizer, CLIPTextModel
 
@@ -129,13 +130,6 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         # end = datetime.datetime.now().timestamp()
         # print("\nclip消耗时间为：", (end - start)*1000 )
         
-        # outputs = self.transformer(input_ids=tokens)
-        # if self.layer == "last":  #这一条最后是要走的路
-        #     z = outputs.last_hidden_state  #1 2 
-        # elif self.layer == "pooled":
-        #     z = outputs.pooler_output[:, None, :]
-        # else:
-        #     z = outputs.hidden_states[self.layer_idx]
         ################################## update: clip trt infer ########################################
         # buffer_device_clip = [] #记录输入输出的地址指针   
         # buffer_device_clip.append(tokens.reshape(-1).data_ptr())

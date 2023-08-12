@@ -2,6 +2,9 @@ import einops
 import torch
 import torch as th
 import torch.nn as nn
+# import datetime
+# import os
+# os.environ['CUDA_MODULE_LOADING'] = 'LAZY'  #不要用，效果不好
 
 from ldm.modules.diffusionmodules.util import (
     conv_nd,
@@ -20,6 +23,7 @@ from ldm.models.diffusion.ddim import DDIMSampler
 
 
 class ControlledUnetModel(UNetModel):
+    # def forward(self, x, timesteps=None, context=None, control=None, only_mid_control=False, **kwargs):
     def forward(self, x, timesteps=None, context=None, control=None, only_mid_control=False, **kwargs):
         hs = []
         with torch.no_grad():
@@ -76,6 +80,7 @@ class ControlNet(nn.Module):
             disable_middle_self_attn=False,
             use_linear_in_transformer=False,
     ):
+        super().__init__()
         super().__init__()
         if use_spatial_transformer:
             assert context_dim is not None, 'Fool!! You forgot to include the dimension of your cross-attention conditioning...'
@@ -306,7 +311,6 @@ class ControlNet(nn.Module):
 
 
 class ControlLDM(LatentDiffusion):
-
     def __init__(self, control_stage_config, control_key, only_mid_control, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.control_model = instantiate_from_config(control_stage_config)
@@ -325,19 +329,70 @@ class ControlLDM(LatentDiffusion):
         control = control.to(memory_format=torch.contiguous_format).float()
         return x, dict(c_crossattn=[c], c_concat=[control])
 
-    def apply_model(self, x_noisy, t, cond, *args, **kwargs):
+    def apply_model(self, x_noisy, t, cond,unconditional_conditioning,*args, **kwargs):
         assert isinstance(cond, dict)
         diffusion_model = self.model.diffusion_model
 
+        "--------------------------------数据 拼接x2-------------------------------"
+        x_noisy = torch.cat([x_noisy, x_noisy], 0)
+        #将t类型改为int32
+        t = t.to(torch.int32)
+        t = torch.cat([t, t], 0)
+
         cond_txt = torch.cat(cond['c_crossattn'], 1)
+        cond_uncon = torch.cat(unconditional_conditioning['c_crossattn'], 1)
+        cond_txt  = torch.cat([cond_txt, cond_uncon], 0) #将 cond_txt 和 cont_uncon 拼接起来
+        "---------------------------------------------------------------"
 
         if cond['c_concat'] is None:
-            eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=None, only_mid_control=self.only_mid_control)
+            pass
         else:
-            control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_txt)
-            control = [c * scale for c, scale in zip(control, self.control_scales)]
-            eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
+            """这里参考 代码 更改"""
+            # start = datetime.datetime.now().timestamp()
+            # control = self.control_model(x=x_noisy, hint=torch.cat(cond['c_concat'], 1), timesteps=t, context=cond_txt)
+            # end = datetime.datetime.now().timestamp()
+            # print("\ncontrolnet消耗时间为：",(end - start)*1000 )
+            # control = [c * scale for c, scale in zip(control, self.control_scales)] 
+            # #没有用
 
+            hint_in = torch.cat(cond['c_concat'], 1)
+            hint_in = torch.cat([hint_in,hint_in], 0)
+
+            # b, c, h, w = x_noisy.shape
+
+            buffer_device = []
+            buffer_device.append(x_noisy.reshape(-1).data_ptr())
+            buffer_device.append(hint_in.reshape(-1).data_ptr())
+            buffer_device.append(t.reshape(-1).data_ptr())
+            buffer_device.append(cond_txt.reshape(-1).data_ptr())
+
+            control_out = []  #这里可以不用
+            for i in range(13):
+                control_out.append(self.control_out[i])
+                buffer_device.append(self.control_out[i].reshape(-1).data_ptr())
+
+            self.control_context.execute_v2(buffer_device)
+
+            control = [c * scale for c, scale in zip(control_out, self.control_scales)]
+
+           
+            ################################# update: diffusion trt infer ########################################
+            # start = datetime.datetime.now().timestamp()
+            # eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
+            # end = datetime.datetime.now().timestamp()
+            # print("\ndiffusion消耗时间为：", (end - start)*1000 )
+           
+            
+            buffer_device = []
+            buffer_device.append(x_noisy.reshape(-1).data_ptr())
+            buffer_device.append(t.reshape(-1).data_ptr())
+            buffer_device.append(cond_txt.reshape(-1).data_ptr())
+            for temp in control:
+                buffer_device.append(temp.reshape(-1).data_ptr())
+            eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+            buffer_device.append(eps.reshape(-1).data_ptr())
+            self.diffusion_context.execute_v2(buffer_device)
+            ######################################################################################################
         return eps
 
     @torch.no_grad()
@@ -433,3 +488,25 @@ class ControlLDM(LatentDiffusion):
             self.control_model = self.control_model.cpu()
             self.first_stage_model = self.first_stage_model.cuda()
             self.cond_stage_model = self.cond_stage_model.cuda()
+
+ ################################update#######################
+    @torch.no_grad()
+    def decode_first_stage(self, z, predict_cids=False, force_not_quantize=False):
+        if predict_cids:
+            if z.dim() == 4:
+                z = torch.argmax(z.exp(), dim=1).long()
+            z = self.first_stage_model.quantize.get_codebook_entry(z, shape=None)
+            z = rearrange(z, 'b h w c -> b c h w').contiguous()
+
+        z = 1. / self.scale_factor * z
+
+        #TODO 创建engine，并且把调用self.first_stage_model.decode
+        #return 1,3,256,384
+        buffer_device = []
+        buffer_device.append(z.reshape(-1).data_ptr())
+        decode_result = torch.zeros(1,3,256,384,dtype=torch.float32).to("cuda")
+        buffer_device.append(decode_result.reshape(-1).data_ptr())
+        
+        self.vae_decode_context.execute_v2(buffer_device)
+
+        return decode_result

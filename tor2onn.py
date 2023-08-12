@@ -16,41 +16,41 @@ def gen_onnx():
     W = 384
 
     """----------------------------------------------转换cond_stage_model为engine-----------------"""
-    # cond_stage_model = model.cond_stage_model
-    # clip = cond_stage_model.transformer #
-    # input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")
-    # input_names = ["input_ids"]
-    # output_names = ["context","pooled_output"]
-    # print("开始转换clip为onnx")
-    # torch.onnx.export(clip,
-    #                 (input_ids),
-    #                 "sd_clip.onnx",
-    #                 export_params=True,
-    #                 opset_version=16,
-    #                 do_constant_folding=True,
-    #                 keep_initializers_as_inputs=False,
-    #                 input_names = input_names, 
-    #                 output_names = output_names)
-    # print("clip转换完成")
+    cond_stage_model = model.cond_stage_model
+    clip = cond_stage_model.transformer #
+    input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")
+    input_names = ["input_ids"]
+    output_names = ["context","pooled_output"]
+    print("开始转换clip为onnx")
+    torch.onnx.export(clip,
+                    (input_ids),
+                    "sd_clip.onnx",
+                    export_params=True,
+                    opset_version=16,
+                    do_constant_folding=True,
+                    keep_initializers_as_inputs=False,
+                    input_names = input_names, 
+                    output_names = output_names)
+    print("clip转换完成")
 
-    # onnx_model = onnx_from_path("./sd_clip.onnx")
-    # # change onnx -inf to -1e4
-    # for node in onnx_model.graph.node:
-    #     if node.op_type == "ConstantOfShape":
-    #         print(node)
-    #         attr = node.attribute[0]
-    #         print(attr)
-    #         if attr.name == "value" and attr.t.data_type == onnx.TensorProto.FLOAT:
-    #             np_array = np.frombuffer(attr.t.raw_data, dtype=np.float32).copy()
-    #             print("raw array", np_array)
-    #             np_array[np_array == -np.inf] = -100000  # 将所有负无穷的值改为-100000
-    #             attr.t.raw_data = np_array.tobytes() 
-    #             print("new array", np_array)
-    #         print(attr)
-    # onnx.save_model(
-    #     onnx_model,
-    #     "sd_clip.onnx",
-    # )
+    onnx_model = onnx_from_path("./sd_clip.onnx")
+    # change onnx -inf to -1e4
+    for node in onnx_model.graph.node:
+        if node.op_type == "ConstantOfShape":
+            print(node)
+            attr = node.attribute[0]
+            print(attr)
+            if attr.name == "value" and attr.t.data_type == onnx.TensorProto.FLOAT:
+                np_array = np.frombuffer(attr.t.raw_data, dtype=np.float32).copy()
+                print("raw array", np_array)
+                np_array[np_array == -np.inf] = -100000  # 将所有负无穷的值改为-100000
+                attr.t.raw_data = np_array.tobytes() 
+                print("new array", np_array)
+            print(attr)
+    onnx.save_model(
+        onnx_model,
+        "sd_clip.onnx",
+    )
 
     """-----------------------------------------------转换control_model为engine-----------------------------------------------"""
     control_model = model.control_model

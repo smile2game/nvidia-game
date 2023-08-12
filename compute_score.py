@@ -45,10 +45,18 @@ for i in range(20):
     new_path = "./pics_bird/bird_"+ str(i) + ".jpg"
     cv2.imwrite(new_path, new_img[0])
     # generate the base_img by running the pytorch fp32 pipeline (origin code in canny2image_TRT.py)
-    base_path = path
+    base_path = "./torch_out/bird_"+ str(i) + ".jpg"
     score = PD(base_path, new_path)
     scores.append(score)
     print("得到的分数是: ", score)
+
+
 print("------------\n----------时间列表为：",latencys)
 print("------------\n----------平均时间为：",np.mean(latencys))
 print("------------\n----------分数列表为：",scores)
+count = 0
+for i in scores:
+    if i >= 8:
+        count += 1
+print("超出8的个数为:",count)
+

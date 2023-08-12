@@ -33,7 +33,7 @@ class hackathon():
         H = 256
         W = 384
         """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
-        """---------------------------------------------------------------------------------"""
+       
 
         """---------------------------加载controlnet--------------------"""
         if not os.path.isfile("sd_control_fp16.engine"):
@@ -116,7 +116,7 @@ class hackathon():
             print("开始转换diffusion_model为onnx！\n")
             torch.onnx.export(diffusion_model,               
                                 (x_in, time_in, context_in, control),  
-                                "./sd_diffusion.onnx",   
+                                "./ooo/sd_diffusion.onnx",   
                                 export_params=True,#
                                 opset_version=17,
                                 keep_initializers_as_inputs=True,
@@ -128,7 +128,7 @@ class hackathon():
 
             print("转换diffusion_model为onnx成功！")
 
-            os.system("trtexec --onnx=./sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --useCudaGraph --verbose --builderOptimizationLevel=3")
+            os.system("trtexec --onnx=./ooo/sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --useCudaGraph --verbose --builderOptimizationLevel=3")
             #level = 4 会 killed; level = 5 会 segment default
 
         with open("sd_diffusion_fp16.engine", 'rb') as f:
