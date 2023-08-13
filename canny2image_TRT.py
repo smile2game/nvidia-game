@@ -67,7 +67,7 @@ class hackathon():
         """---------------------------加载controlnet--------------------""" 
         self.model.x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
         self.model.h_in = torch.randn(2, 3, H, W, dtype=torch.float32).to("cuda")
-        self.model.time_in = torch.zeros(2, dtype=torch.int32).to("cuda")
+        self.model.time_in = torch.zeros(2, dtype=torch.int64).to("cuda")
         self.model.context_in = torch.randn(2, 77, 768, dtype=torch.float32).to("cuda")
         self.model.control_out = []
         self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
@@ -90,7 +90,7 @@ class hackathon():
             control_model = self.model.control_model 
             x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
             h_in = torch.randn(2, 3, H, W, dtype=torch.float32).to("cuda")
-            t_in = torch.zeros(2, dtype=torch.int32).to("cuda")  #难道是这里溢出了
+            t_in = torch.zeros(2, dtype=torch.int64).to("cuda")  #难道是这里溢出了
             c_in = torch.randn(2, 77, 768, dtype=torch.float32).to("cuda")
 
             output_names = []
@@ -149,7 +149,7 @@ class hackathon():
             diffusion_model = self.model.model.diffusion_model #找对了
             print("转换diffusion_model为onnx模型")
             x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
-            time_in = torch.zeros(2, dtype=torch.int32).to("cuda")
+            time_in = torch.zeros(2, dtype=torch.int64).to("cuda")
             context_in = torch.randn(2, 77, 768, dtype=torch.float32).to("cuda")
             control = []
             control.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
@@ -300,9 +300,6 @@ class hackathon():
 if __name__ == "__main__":
     h = hackathon()
     h.initialize()
-
-
-
 
 
 
