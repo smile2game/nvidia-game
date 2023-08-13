@@ -128,13 +128,6 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
         tokens = batch_encoding["input_ids"].to(self.device).to(torch.int32)
-        # tokens = batch_encoding["input_ids"].to(self.device)
-
-        # start = datetime.datetime.now().timestamp()
-        # context = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")["last_hidden_state"]  #这里是真的有大问题
-        # end = datetime.datetime.now().timestamp()
-        # print("\nclip消耗时间为：", (end - start)*1000 )
-        
         ################################## update: clip trt infer ########################################
         buffer_device_clip = [] #记录输入输出的地址指针   
         buffer_device_clip.append(tokens.reshape(-1).data_ptr())

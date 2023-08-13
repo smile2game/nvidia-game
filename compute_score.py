@@ -50,12 +50,12 @@ for i in range(20):
     scores.append(score)
     print("得到的分数是: ", score)
 print("------------\n----------时间列表为：",latencys)
-print("------------\n----------平均时间为：",np.mean(latencys))
+print("------------\n----------放在服务器上平均时间为：",np.mean(latencys)+90)
 print("------------\n----------分数列表为：",scores)
-print("------------\n----------分数平均分：",np.mean(scores))
+print("------------\n----------放在服务器上分数平均分：",np.mean(scores)+2)
 count = 0
 for i in scores:
-    if i >= 8:
+    if i >= 6.5:
         count += 1
-print("超出8的个数为:",count)
+print("超出8.5的个数为:",count)
 

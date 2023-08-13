@@ -29,11 +29,8 @@ class hackathon():
 
         self.trt_logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.trt_logger, '')
-
         H = 256
         W = 384
-       
-        
         """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
         if not os.path.isfile("sd_clip.engine"):
             cond_stage_model = self.model.cond_stage_model
@@ -173,6 +170,7 @@ class hackathon():
         cudart.cudaStreamSynchronize(self.model.control_stream)
         self.model.control_context = control_context
         print("\ncontrolnet成功启用")
+        
         """-----------------------------------------------加载unet的engine模型-----------------------------------------------"""
         if not os.path.isfile("sd_diffusion_fp16.engine"):
             diffusion_model = self.model.model.diffusion_model #找对了
