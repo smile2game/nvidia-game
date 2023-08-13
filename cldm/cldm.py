@@ -359,11 +359,11 @@ class ControlLDM(LatentDiffusion):
             self.context_in.copy_(cond_txt)
            #######################################推断control_net###############################################################
             cudart.cudaGraphLaunch(self.graphExe_control, self.control_stream)
-            # cudart.cudaStreamSynchronize(self.control_stream)
+            cudart.cudaStreamSynchronize(self.control_stream)
            
             ##################推断unet######################################################################
             cudart.cudaGraphLaunch(self.graphExe_diffusion, self.diffusion_stream)
-            # cudart.cudaStreamSynchronize(self.diffusion_stream)
+            cudart.cudaStreamSynchronize(self.diffusion_stream)
 
             ######################################################################################################
         return self.eps
