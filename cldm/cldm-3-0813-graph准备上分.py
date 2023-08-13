@@ -366,6 +366,7 @@ class ControlLDM(LatentDiffusion):
             cudart.cudaGraphLaunch(self.graphExe_diffusion, self.diffusion_stream)
             cudart.cudaStreamSynchronize(self.diffusion_stream)
 
+            print("赋值后张量地址",self.eps.data_ptr())
             ######################################################################################################
         return self.eps
 

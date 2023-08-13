@@ -32,68 +32,72 @@ class hackathon():
 
         H = 256
         W = 384
-       
-        
-        """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
-        if not os.path.isfile("sd_clip.engine"):
-            cond_stage_model = self.model.cond_stage_model
-            clip = cond_stage_model.transformer #
-
-            input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
-            dynamic_axes = {'input_ids' : {0 : 'bs'},
-                            'context' : {0 : 'bs'},
-                            'pooled_output' : {0 : 'bs'}}
-            input_names = ["input_ids"]
-            output_names = ["context","pooled_output"]
-            print("开始转换clip为onnx")
-            torch.onnx.export(clip,
-                                (input_ids),
-                                "./sd_clip.onnx",
-                            export_params=True,
-                            opset_version=18,
-                            do_constant_folding=True,
-                            keep_initializers_as_inputs=True,
-                            input_names = input_names, 
-                            output_names = output_names,
-                            dynamic_axes=dynamic_axes)
-            os.system("trtexec --onnx=./sd_clip.onnx --saveEngine=./sd_clip.engine --useCudaGraph  --builderOptimizationLevel=5")
-            print("clip转换完成")
-
-        with open("./sd_clip.engine", 'rb') as f:
-                engine_str = f.read()
-        clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-        clip_context = clip_engine.create_execution_context()
-
-        ##############################################################################################################
-        # clip_nIO = clip_engine.num_io_tensors
-        # clip_tensor_name = [clip_engine.get_tensor_name(i) for i in range(clip_nIO)]
-        # #创建流
-        # _, self.model.cond_stage_model.clip_stream = cudart.cudaStreamCreate()
-        # #buffer处理
-        # self.model.cond_stage_model.input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")
-        # print("定义的input",self.model.cond_stage_model.input_ids.data_ptr())
+        """-------------------------------搞buffer-------------------------------"""
         # self.model.cond_stage_model.context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
         # self.model.cond_stage_model.pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
-        # buffer_clip = []
-        # buffer_clip.append(self.model.cond_stage_model.input_ids.reshape(-1).data_ptr())
-        # buffer_clip.append(self.model.cond_stage_model.context.reshape(-1).data_ptr())
-        # buffer_clip.append(self.model.cond_stage_model.pooled_output.reshape(-1).data_ptr())
-        # #提前推断
-        # for i in range(clip_nIO):
-        #     clip_context.set_tensor_address(clip_tensor_name[i], buffer_clip[i])
-        # clip_context.execute_async_v3(self.model.cond_stage_model.clip_stream)
+        # self.model.decode_result = torch.zeros(1,3,256,384,dtype=torch.float32).to("cuda")
+        """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
+        if not os.path.isfile("sd_clip.engine"):
+                cond_stage_model = self.model.cond_stage_model
+                clip = cond_stage_model.transformer #
 
-        # #捕获
-        # cudart.cudaStreamBeginCapture(self.model.cond_stage_model.clip_stream, cudart.cudaStreamCaptureMode.cudaStreamCaptureModeGlobal)
-        # clip_context.execute_async_v3(self.model.cond_stage_model.clip_stream) #可以改
-        # _, graph = cudart.cudaStreamEndCapture(self.model.cond_stage_model.clip_stream)  #结束
-        # _, self.model.cond_stage_model.graphExe_clip = cudart.cudaGraphInstantiate(graph, 0) #实例化,这个直接调用
-        # #图推断测试
-        # cudart.cudaGraphLaunch(self.model.cond_stage_model.graphExe_clip, self.model.cond_stage_model.clip_stream)
-        # cudart.cudaStreamSynchronize(self.model.cond_stage_model.clip_stream)
-        ##############################################################################################################
-        self.model.cond_stage_model.clip_context = clip_context
-        print("加载成功clip！！！")
+                input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
+                dynamic_axes = {'input_ids' : {0 : 'bs'},
+                                'context' : {0 : 'bs'},
+                                'pooled_output' : {0 : 'bs'}}
+                input_names = ["input_ids"]
+                output_names = ["context","pooled_output"]
+                print("开始转换clip为onnx")
+                torch.onnx.export(clip,
+                                    (input_ids),
+                                    "./sd_clip.onnx",
+                                export_params=True,
+                                opset_version=18,
+                                do_constant_folding=True,
+                                keep_initializers_as_inputs=True,
+                                input_names = input_names, 
+                                output_names = output_names,
+                                dynamic_axes=dynamic_axes)
+                os.system("trtexec --onnx=./sd_clip.onnx --saveEngine=./sd_clip.engine --useCudaGraph  --builderOptimizationLevel=5")
+                print("clip转换完成")
+        with open("./sd_clip.engine", 'rb') as f:
+                engine_str = f.read()
+                
+        clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
+        clip_context = clip_engine.create_execution_context()
+        
+        clip_nIO = clip_engine.num_io_tensors
+        clip_tensor_name = [clip_engine.get_tensor_name(i) for i in range(clip_nIO)]
+        #创建流
+        _, self.model.clip_stream = cudart.cudaStreamCreate()
+        #buffer处理
+        self.model
+        buffer_clip = []
+        buffer_clip.append(self.model.x_in.reshape(-1).data_ptr())
+        buffer_clip.append(self.model.h_in.reshape(-1).data_ptr())
+        buffer_clip.append(self.model.time_in.reshape(-1).data_ptr())
+        buffer_clip.append(self.model.context_in.reshape(-1).data_ptr())
+        for temp in self.model.clip_out:
+            buffer_clip.append(temp.reshape(-1).data_ptr())
+        
+        #提前推断
+        for i in range(clip_nIO):
+            clip_context.set_tensor_address(clip_tensor_name[i], buffer_clip[i])
+        clip_context.execute_async_v3(self.model.clip_stream)
+
+        #捕获
+        cudart.cudaStreamBeginCapture(self.model.clip_stream, cudart.cudaStreamCaptureMode.cudaStreamCaptureModeGlobal)
+        clip_context.execute_async_v3(self.model.clip_stream) #可以改
+        _, graph = cudart.cudaStreamEndCapture(self.model.clip_stream)  #结束
+        _, self.model.graphExe_clip = cudart.cudaGraphInstantiate(graph, 0) #实例化,这个直接调用
+        #图推断测试
+        cudart.cudaGraphLaunch(self.model.graphExe_clip, self.model.clip_stream)
+        cudart.cudaStreamSynchronize(self.model.clip_stream)
+        self.model.clip_context = clip_context
+        print("\nclip成功启用")
+
+
+
         """---------------------------加载controlnet--------------------""" 
         self.model.x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
         self.model.h_in = torch.randn(2, 3, H, W, dtype=torch.float32).to("cuda")
@@ -126,7 +130,7 @@ class hackathon():
             output_names = []
             for i in range(13):
                 output_names.append("out_"+ str(i))
-
+                
             torch.onnx.export(control_model,               
                                 (x_in, h_in, t_in, c_in),  
                                 "./sd_control.onnx",   
@@ -214,7 +218,7 @@ class hackathon():
             
             #dynamic
             print("转换diffusion_model为onnx成功！")
-            os.system("trtexec --onnx=./sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --useCudaGraph --verbose --builderOptimizationLevel=3")
+            os.system("trtexec --onnx=./sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --useCudaGraph --verbose --builderOptimizationLevel=5")
             #level = 4 会 killed; level = 5 会 segment default
 
         with open("sd_diffusion_fp16.engine", 'rb') as f:
@@ -282,6 +286,29 @@ class hackathon():
         """-----------------------------------------------"""
 
         """-------------------------提前开buffer----------------------"""
+        #controlnet:4 -> 13
+        #unet: 3 + 13 -> 1
+        #总共：4 +13 +3+1=21
+        # self.model.cond_stage_model.context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
+        # self.model.cond_stage_model.pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
+        # self.model.control_out = []
+
+        # self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        # self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        
+        # self.model.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+        
         self.model.decode_result = torch.zeros(1,3,256,384,dtype=torch.float32).to("cuda")
         """-----------------------------------------------"""
 

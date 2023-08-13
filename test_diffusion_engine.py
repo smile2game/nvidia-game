@@ -11,9 +11,14 @@ os.environ['CUDA_MODULE_LOADING'] = 'LAZY'
 H = 256
 W = 384
 
-diffusion_trt = "./1-engine_b2/sd_diffusion_fp16.engine"
+diffusion_trt = "./sd_diffusion_fp16.engine"
 
 class hackathon():
+    def __init__(self):
+        self.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+        print("初始化时地址为：",self.eps.data_ptr())
+        _, self.diffusion_stream = cudart.cudaStreamCreate()
+
     def initialize(self):
         self.logger = trt.Logger(trt.Logger.WARNING)
         trt.init_libnvinfer_plugins(self.logger, '')
@@ -73,49 +78,54 @@ class hackathon():
         buffer_device.append(self.context_in.reshape(-1).data_ptr())
         for temp in self.control:
             buffer_device.append(temp.reshape(-1).data_ptr())
-        self.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+        # self.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+        # print("初始地址为：",self.eps.data_ptr())
         buffer_device.append(self.eps.reshape(-1).data_ptr())
 
-        #创流 开捕
+        
+        
+        #提前推断
         for i in range(diffusion_nIO):
             self.diffusion_context.set_tensor_address(diffusion_tensor_name[i], buffer_device[i])
-        self.diffusion_context.execute_async_v3(diffusion_engine)
-        cudart.cudaStreamSynchronize(diffusion_stream)
+        self.diffusion_context.execute_async_v3(self.diffusion_stream)
 
-        _, diffusion_stream = cudart.cudaStreamCreate()
-        cudart.cudaStreamBeginCapture(diffusion_stream, cudart.cudaStreamCaptureMode.cudaStreamCaptureModeGlobal)
-        for i in range(diffusion_nIO):
-            self.diffusion_context.set_tensor_address(diffusion_tensor_name[i], buffer_device[i])
-        self.diffusion_context.execute_async_v3(diffusion_engine)
-        cudart.cudaStreamSynchronize(diffusion_stream)
-        
-        
-        #结束捕获
-        # _, graph = cudart.cudaStreamEndCapture(diffusion_stream)
-        # _, graphExe = cudart.cudaGraphInstantiate(graph, 0)
+        #捕获
+        cudart.cudaStreamBeginCapture(self.diffusion_stream, cudart.cudaStreamCaptureMode.cudaStreamCaptureModeGlobal)
+        # for i in range(diffusion_nIO):
+        #     self.diffusion_context.set_tensor_address(diffusion_tensor_name[i], buffer_device[i])
+        self.diffusion_context.execute_async_v3(self.diffusion_stream)
+        _, graph = cudart.cudaStreamEndCapture(self.diffusion_stream)  #结束
+        _, self.graphExe = cudart.cudaGraphInstantiate(graph, 0) #实例化
+
+        self.eps.copy_(torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda"))
+        print("第二次地址为：",self.eps.data_ptr())
+       
+        #图推断
+        cudart.cudaGraphLaunch(self.graphExe, self.diffusion_stream)
+        cudart.cudaStreamSynchronize(self.diffusion_stream)
         end = datetime.datetime.now().timestamp()
         print("\n通过initialize节约的时间为:",(end-start)*1000)
 
-      
+        print("\n在process里，图推断结果为：",self.eps)
 
+        print("buffer中放置的地址为:",buffer_device[-1])
 
     def process(self):
         ###################################        
-        # _, diffusion_stream = cudart.cudaStreamCreate()
-        # #execute
-        # self.diffusion_context.execute_async_v3(diffusion_stream)
-        self.diffusion_context.execute_async_v3(0)
+
+        cudart.cudaGraphLaunch(self.graphExe, self.diffusion_stream)
+        cudart.cudaStreamSynchronize(self.diffusion_stream)
         return self.eps
     
 if __name__ == "__main__":
     times = []
     h = hackathon()
     h.initialize()
-    start = datetime.datetime.now().timestamp()
-    res = h.process()
-    end = datetime.datetime.now().timestamp()
-    times.append((end - start)*1000)
-    # print("\ncontrolnet的输出为：",h.control_out)
-    print("\ndiffusion的输出为：",res)
-    print("\n执行process流程,消耗时间为：", times)
+    # start = datetime.datetime.now().timestamp()
+    # res = h.process()
+    # end = datetime.datetime.now().timestamp()
+    # times.append((end - start)*1000)
+    # # print("\ncontrolnet的输出为：",h.control_out)
+    # print("\ndiffusion的输出为：",res)
+    # print("\n执行process流程,消耗时间为：", times)
         

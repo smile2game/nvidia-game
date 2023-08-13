@@ -49,11 +49,10 @@ for i in range(20):
     score = PD(base_path, new_path)
     scores.append(score)
     print("得到的分数是: ", score)
-
-
 print("------------\n----------时间列表为：",latencys)
 print("------------\n----------平均时间为：",np.mean(latencys))
 print("------------\n----------分数列表为：",scores)
+print("------------\n----------分数平均分：",np.mean(scores))
 count = 0
 for i in scores:
     if i >= 8:
