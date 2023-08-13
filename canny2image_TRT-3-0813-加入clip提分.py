@@ -48,7 +48,7 @@ class hackathon():
                                     (input_ids),
                                     "./sd_clip.onnx",
                                 export_params=True,
-                                opset_version=18,
+                                opset_version=16,
                                 do_constant_folding=True,
                                 keep_initializers_as_inputs=True,
                                 input_names = input_names, 
@@ -62,7 +62,6 @@ class hackathon():
                 clip_context = clip_engine.create_execution_context()
         self.model.cond_stage_model.clip_context = clip_context
         print("加载成功clip！！！")
-
         """---------------------------加载controlnet--------------------"""
         if not os.path.isfile("sd_control_fp16.engine"):
             control_model = self.model.control_model 
@@ -75,25 +74,25 @@ class hackathon():
             for i in range(13):
                 output_names.append("out_"+ str(i))
 
-            # dynamic_table = {'x_in' : {0 : 'bs'}, 
-            #                     'h_in' : {0 : 'bs'}, 
-            #                     't_in' : {0 : 'bs'},
-            #                     'c_in' : {0 : 'bs'}}
-            # for i in range(13):
-            #     dynamic_table[output_names[i]] = {0 : "bs"}
+            dynamic_table = {'x_in' : {0 : 'bs'}, 
+                                'h_in' : {0 : 'bs'}, 
+                                't_in' : {0 : 'bs'},
+                                'c_in' : {0 : 'bs'}}
+            for i in range(13):
+                dynamic_table[output_names[i]] = {0 : "bs"}
 
             torch.onnx.export(control_model,               
                                 (x_in, h_in, t_in, c_in),  
                                 "./sd_control.onnx",   
                                 export_params=True,
-                                opset_version=18,
+                                opset_version=17,
                                 do_constant_folding=True,
                                 keep_initializers_as_inputs=True,
                                 input_names = ['x_in', "h_in", "t_in", "c_in"], 
-                                output_names = output_names)
-                                # dynamic_axes = dynamic_table)
+                                output_names = output_names,
+                                dynamic_axes = dynamic_table)
 
-            os.system("trtexec --onnx=./sd_control.onnx --saveEngine=./sd_control_fp16.engine --fp16 --verbose --useCudaGraph --builderOptimizationLevel=3")
+            os.system("trtexec --onnx=./sd_control.onnx --saveEngine=./sd_control_fp16.engine --fp16 --verbose --useCudaGraph --optShapes=x_in:2x4x32x48,h_in:2x3x256x384,t_in:2,c_in:2x77x768  --minShapes=x_in:2x4x32x48,h_in:2x3x256x384,t_in:2,c_in:2x77x768  --maxShapes=x_in:2x4x32x48,h_in:2x3x256x384,t_in:2,c_in:2x77x768  --builderOptimizationLevel=3")
             #自带cuda graph
 
         with open("./sd_control_fp16.engine", 'rb') as f:
@@ -134,19 +133,19 @@ class hackathon():
                 input_names.append("control_"+str(i))
             output_names = ["out_h"]
 
-            # dynamic_table = {'x_in' : {0 : 'bs', 2 : 'H', 3 : 'W'}, 
-            #                     'time_in' : {0 : 'bs'},
-            #                     'context_in' : {0 : 'bs'}}
-            # for i in range(3,15):
-            #         dynamic_table[input_names[i]] = {0 : "bs"}
+            dynamic_table = {'x_in' : {0 : 'bs', 2 : 'H', 3 : 'W'}, 
+                                'time_in' : {0 : 'bs'},
+                                'context_in' : {0 : 'bs'}}
+            for i in range(3,15):
+                    dynamic_table[input_names[i]] = {0 : "bs"}
 
 
             print("开始转换diffusion_model为onnx！\n")
             torch.onnx.export(diffusion_model,               
                                 (x_in, time_in, context_in, control),  
-                                "./sd_diffusion.onnx",   
+                                "./ooo/sd_diffusion.onnx",   
                                 export_params=True,#
-                                opset_version=18,
+                                opset_version=17,
                                 keep_initializers_as_inputs=True,
                                 do_constant_folding=True,
                                 input_names =input_names, 
@@ -155,7 +154,8 @@ class hackathon():
             #dynamic
 
             print("转换diffusion_model为onnx成功！")
-            os.system("trtexec --onnx=./sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --useCudaGraph --verbose --builderOptimizationLevel=3")
+
+            os.system("trtexec --onnx=./ooo/sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --useCudaGraph --verbose --builderOptimizationLevel=3")
             #level = 4 会 killed; level = 5 会 segment default
 
         with open("sd_diffusion_fp16.engine", 'rb') as f:
@@ -198,7 +198,7 @@ class hackathon():
                 (torch.randn(1, 4, 32, 48, device="cuda")),
                 './sd_vae.onnx',
                 export_params=True,
-                opset_version=18,
+                opset_version=17,
                 do_constant_folding=True,
                 input_names=['z'],
                 output_names=['dec'],

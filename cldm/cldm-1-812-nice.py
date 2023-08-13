@@ -2,7 +2,6 @@ import einops
 import torch
 import torch as th
 import torch.nn as nn
-# from cuda import cudart
 # import datetime
 # import os
 # os.environ['CUDA_MODULE_LOADING'] = 'LAZY'  #不要用，效果不好
@@ -318,8 +317,6 @@ class ControlLDM(LatentDiffusion):
         self.control_key = control_key
         self.only_mid_control = only_mid_control
         self.control_scales = [1.0] * 13
-        self.eps = None
-        self.decode_result = None
 
     @torch.no_grad()
     def get_input(self, batch, k, bs=None, *args, **kwargs):
@@ -384,26 +381,19 @@ class ControlLDM(LatentDiffusion):
             # eps = diffusion_model(x=x_noisy, timesteps=t, context=cond_txt, control=control, only_mid_control=self.only_mid_control)
             # end = datetime.datetime.now().timestamp()
             # print("\ndiffusion消耗时间为：", (end - start)*1000 )
+           
+            
             buffer_device = []
             buffer_device.append(x_noisy.reshape(-1).data_ptr())
             buffer_device.append(t.reshape(-1).data_ptr())
             buffer_device.append(cond_txt.reshape(-1).data_ptr())
             for temp in control:
                 buffer_device.append(temp.reshape(-1).data_ptr())
-            # self.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
-            buffer_device.append(self.eps.reshape(-1).data_ptr())
+            eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+            buffer_device.append(eps.reshape(-1).data_ptr())
             self.diffusion_context.execute_v2(buffer_device)
-            
-            # cudart.cudaStreamSynchronize(self.stream)
-            # self.x_in = x_noisy
-            # self.time_in = t
-            # self.context_in = cond_txt
-            # for i in range(13):
-            #     self.control_out[i] = control[i]
-            # flag = self.diffusion_context.execute_async_v3(self.stream)
-            # cudart.cudaStreamSynchronize(self.stream)
             ######################################################################################################
-        return self.eps
+        return eps
 
     @torch.no_grad()
     def get_unconditional_conditioning(self, N):
@@ -514,7 +504,9 @@ class ControlLDM(LatentDiffusion):
         #return 1,3,256,384
         buffer_device = []
         buffer_device.append(z.reshape(-1).data_ptr())
-        # decode_result = torch.zeros(1,3,256,384,dtype=torch.float32).to("cuda")
-        buffer_device.append(self.decode_result.reshape(-1).data_ptr())
+        decode_result = torch.zeros(1,3,256,384,dtype=torch.float32).to("cuda")
+        buffer_device.append(decode_result.reshape(-1).data_ptr())
+        
         self.vae_decode_context.execute_v2(buffer_device)
-        return self.decode_result
+
+        return decode_result

@@ -155,6 +155,7 @@ class hackathon():
         diffusion_context.set_binding_shape(13, (2,1280, H//64, W //64))
         diffusion_context.set_binding_shape(14, (2,1280, H//64, W //64))
         diffusion_context.set_binding_shape(15, (2,1280, H//64, W //64))
+        
         self.model.diffusion_context = diffusion_context
         print("加载成功diffusion_model的engine")
         """----------------------------------------------------------------------------------------------"""

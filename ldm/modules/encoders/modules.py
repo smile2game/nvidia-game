@@ -126,21 +126,21 @@ class FrozenCLIPEmbedder(AbstractEncoder):
         tokens = batch_encoding["input_ids"].to(self.device).to(torch.int32)
 
         # start = datetime.datetime.now().timestamp()
-        context = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")["last_hidden_state"]  #这里是真的有大问题
+        # context = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")["last_hidden_state"]  #这里是真的有大问题
         # end = datetime.datetime.now().timestamp()
         # print("\nclip消耗时间为：", (end - start)*1000 )
         
         ################################## update: clip trt infer ########################################
-        # buffer_device_clip = [] #记录输入输出的地址指针   
-        # buffer_device_clip.append(tokens.reshape(-1).data_ptr())
-        # context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
-        # pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
-        # buffer_device_clip.append(context.reshape(-1).data_ptr())
-        # buffer_device_clip.append(pooled_output.reshape(-1).data_ptr())
-        # start = datetime.datetime.now().timestamp()
-        # self.clip_context.execute_v2(buffer_device_clip)   #这里是真的有大问题
-        # end = datetime.datetime.now().timestamp()
-        # print("\nclip消耗时间为：", (end - start)*1000 )
+        buffer_device_clip = [] #记录输入输出的地址指针   
+        buffer_device_clip.append(tokens.reshape(-1).data_ptr())
+        context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
+        pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
+        buffer_device_clip.append(context.reshape(-1).data_ptr())
+        buffer_device_clip.append(pooled_output.reshape(-1).data_ptr())
+        start = datetime.datetime.now().timestamp()
+        self.clip_context.execute_v2(buffer_device_clip)   #这里是真的有大问题
+        end = datetime.datetime.now().timestamp()
+        print("\nclip消耗时间为：", (end - start)*1000 )
         #######################################################################################################
         return context
 

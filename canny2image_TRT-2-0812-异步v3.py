@@ -1,6 +1,6 @@
 from share import *
 import config
-
+from cuda import cudart
 import cv2
 import einops
 import gradio as gr
@@ -33,35 +33,7 @@ class hackathon():
         H = 256
         W = 384
         """-----------------------------------------------加载clip的engine模型-----------------------------------------------"""
-        if not os.path.isfile("sd_clip.engine"):
-                cond_stage_model = self.model.cond_stage_model
-                clip = cond_stage_model.transformer #
-
-                input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
-                dynamic_axes = {'input_ids' : {0 : 'bs'},
-                                'context' : {0 : 'bs'},
-                                'pooled_output' : {0 : 'bs'}}
-                input_names = ["input_ids"]
-                output_names = ["context","pooled_output"]
-                print("开始转换clip为onnx")
-                torch.onnx.export(clip,
-                                    (input_ids),
-                                    "./sd_clip.onnx",
-                                export_params=True,
-                                opset_version=18,
-                                do_constant_folding=True,
-                                keep_initializers_as_inputs=True,
-                                input_names = input_names, 
-                                output_names = output_names,
-                                dynamic_axes=dynamic_axes)
-                os.system("trtexec --onnx=./sd_clip.onnx --saveEngine=./sd_clip.engine --useCudaGraph  --builderOptimizationLevel=5")
-                print("clip转换完成")
-        with open("./sd_clip.engine", 'rb') as f:
-                engine_str = f.read()
-                clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
-                clip_context = clip_engine.create_execution_context()
-        self.model.cond_stage_model.clip_context = clip_context
-        print("加载成功clip！！！")
+        """---------------------------------------------------------------------------------"""
 
         """---------------------------加载controlnet--------------------"""
         if not os.path.isfile("sd_control_fp16.engine"):
@@ -75,25 +47,25 @@ class hackathon():
             for i in range(13):
                 output_names.append("out_"+ str(i))
 
-            # dynamic_table = {'x_in' : {0 : 'bs'}, 
-            #                     'h_in' : {0 : 'bs'}, 
-            #                     't_in' : {0 : 'bs'},
-            #                     'c_in' : {0 : 'bs'}}
-            # for i in range(13):
-            #     dynamic_table[output_names[i]] = {0 : "bs"}
+            dynamic_table = {'x_in' : {0 : 'bs'}, 
+                                'h_in' : {0 : 'bs'}, 
+                                't_in' : {0 : 'bs'},
+                                'c_in' : {0 : 'bs'}}
+            for i in range(13):
+                dynamic_table[output_names[i]] = {0 : "bs"}
 
             torch.onnx.export(control_model,               
                                 (x_in, h_in, t_in, c_in),  
                                 "./sd_control.onnx",   
                                 export_params=True,
-                                opset_version=18,
+                                opset_version=17,
                                 do_constant_folding=True,
                                 keep_initializers_as_inputs=True,
                                 input_names = ['x_in', "h_in", "t_in", "c_in"], 
-                                output_names = output_names)
-                                # dynamic_axes = dynamic_table)
+                                output_names = output_names,
+                                dynamic_axes = dynamic_table)
 
-            os.system("trtexec --onnx=./sd_control.onnx --saveEngine=./sd_control_fp16.engine --fp16 --verbose --useCudaGraph --builderOptimizationLevel=3")
+            os.system("trtexec --onnx=./sd_control.onnx --saveEngine=./sd_control_fp16.engine --fp16 --verbose --useCudaGraph --optShapes=x_in:2x4x32x48,h_in:2x3x256x384,t_in:2,c_in:2x77x768  --minShapes=x_in:2x4x32x48,h_in:2x3x256x384,t_in:2,c_in:2x77x768  --maxShapes=x_in:2x4x32x48,h_in:2x3x256x384,t_in:2,c_in:2x77x768  --builderOptimizationLevel=3")
             #自带cuda graph
 
         with open("./sd_control_fp16.engine", 'rb') as f:
@@ -134,11 +106,11 @@ class hackathon():
                 input_names.append("control_"+str(i))
             output_names = ["out_h"]
 
-            # dynamic_table = {'x_in' : {0 : 'bs', 2 : 'H', 3 : 'W'}, 
-            #                     'time_in' : {0 : 'bs'},
-            #                     'context_in' : {0 : 'bs'}}
-            # for i in range(3,15):
-            #         dynamic_table[input_names[i]] = {0 : "bs"}
+            dynamic_table = {'x_in' : {0 : 'bs', 2 : 'H', 3 : 'W'}, 
+                                'time_in' : {0 : 'bs'},
+                                'context_in' : {0 : 'bs'}}
+            for i in range(3,15):
+                    dynamic_table[input_names[i]] = {0 : "bs"}
 
 
             print("开始转换diffusion_model为onnx！\n")
@@ -146,7 +118,7 @@ class hackathon():
                                 (x_in, time_in, context_in, control),  
                                 "./sd_diffusion.onnx",   
                                 export_params=True,#
-                                opset_version=18,
+                                opset_version=17,
                                 keep_initializers_as_inputs=True,
                                 do_constant_folding=True,
                                 input_names =input_names, 
@@ -155,38 +127,76 @@ class hackathon():
             #dynamic
 
             print("转换diffusion_model为onnx成功！")
+
             os.system("trtexec --onnx=./sd_diffusion.onnx --saveEngine=./sd_diffusion_fp16.engine --fp16 --useCudaGraph --verbose --builderOptimizationLevel=3")
             #level = 4 会 killed; level = 5 会 segment default
 
         with open("sd_diffusion_fp16.engine", 'rb') as f:
             diffusion_engine_str = f.read()
         diffusion_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(diffusion_engine_str)
-        diffusion_context = diffusion_engine.create_execution_context()
-
-        diffusion_context.set_binding_shape(0, (2, 4, H//8, W //8))
-        diffusion_context.set_binding_shape(1, (2,))
-        diffusion_context.set_binding_shape(2, (2, 77,768))
-
-        diffusion_context.set_binding_shape(3, (2, 320, H//8, W //8))
-        diffusion_context.set_binding_shape(4, (2, 320, H//8, W //8))
-        diffusion_context.set_binding_shape(5, (2, 320, H//8, W //8))
-
-        diffusion_context.set_binding_shape(6, (2, 320, H//16, W //16))
-        diffusion_context.set_binding_shape(7, (2, 640, H//16, W //16))
-        diffusion_context.set_binding_shape(8, (2, 640, H//16, W //16))
-        diffusion_context.set_binding_shape(9, (2, 640, H//32, W //32))
-
-        diffusion_context.set_binding_shape(10, (2,1280, H//32, W //32))
-        diffusion_context.set_binding_shape(11, (2,1280, H//32, W //32))
-        diffusion_context.set_binding_shape(12, (2,1280, H//64, W //64))
-        diffusion_context.set_binding_shape(13, (2,1280, H//64, W //64))
-        diffusion_context.set_binding_shape(14, (2,1280, H//64, W //64))
-        diffusion_context.set_binding_shape(15, (2,1280, H//64, W //64))
+        diffusion_nIO = diffusion_engine.num_io_tensors
+        diffusion_tensor_name = [diffusion_engine.get_tensor_name(i) for i in range(diffusion_nIO)]
         
+        diffusion_context = diffusion_engine.create_execution_context()
+        self.model.control_out = []
+        self.model.x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
+        self.model.time_in = torch.zeros(2, dtype=torch.int32).to("cuda")
+        
+        self.model.context_in = torch.randn(2, 77, 768, dtype=torch.float32).to("cuda")
+        self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
+        
+        self.model.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+        #试一下用malloc
+
+        _, self.model.stream = cudart.cudaStreamCreate()
+
+        self.model.buffer_device = []
+        self.model.buffer_device.append(self.model.x_in.reshape(-1).data_ptr())
+        self.model.buffer_device.append(self.model.time_in.reshape(-1).data_ptr())
+        self.model.buffer_device.append(self.model.context_in.reshape(-1).data_ptr())
+        for temp in self.model.control_out:
+            self.model.buffer_device.append(temp.reshape(-1).data_ptr())
+        self.model.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
+        self.model.buffer_device.append(self.model.eps.reshape(-1).data_ptr())
+
+        for i in range(diffusion_nIO):
+            diffusion_context.set_tensor_address(diffusion_tensor_name[i], self.model.buffer_device[i])
+        
+        # diffusion_context.set_binding_shape(0, (2, 4, H//8, W //8))
+        # diffusion_context.set_binding_shape(1, (2,))
+        # diffusion_context.set_binding_shape(2, (2, 77,768))
+
+        # diffusion_context.set_binding_shape(3, (2, 320, H//8, W //8))
+        # diffusion_context.set_binding_shape(4, (2, 320, H//8, W //8))
+        # diffusion_context.set_binding_shape(5, (2, 320, H//8, W //8))
+
+        # diffusion_context.set_binding_shape(6, (2, 320, H//16, W //16))
+        # diffusion_context.set_binding_shape(7, (2, 640, H//16, W //16))
+        # diffusion_context.set_binding_shape(8, (2, 640, H//16, W //16))
+        # diffusion_context.set_binding_shape(9, (2, 640, H//32, W //32))
+
+        # diffusion_context.set_binding_shape(10, (2,1280, H//32, W //32))
+        # diffusion_context.set_binding_shape(11, (2,1280, H//32, W //32))
+        # diffusion_context.set_binding_shape(12, (2,1280, H//64, W //64))
+        # diffusion_context.set_binding_shape(13, (2,1280, H//64, W //64))
+        # diffusion_context.set_binding_shape(14, (2,1280, H//64, W //64))
+        # diffusion_context.set_binding_shape(15, (2,1280, H//64, W //64))
         self.model.diffusion_context = diffusion_context
         print("加载成功diffusion_model的engine")
         """----------------------------------------------------------------------------------------------"""
-        
+
         """------------------------添加vae的部分-----------------------"""
         if not os.path.isfile("sd_vae_fp16.engine"):
             model = self.model.first_stage_model
@@ -198,7 +208,7 @@ class hackathon():
                 (torch.randn(1, 4, 32, 48, device="cuda")),
                 './sd_vae.onnx',
                 export_params=True,
-                opset_version=18,
+                opset_version=17,
                 do_constant_folding=True,
                 input_names=['z'],
                 output_names=['dec'],
@@ -220,25 +230,7 @@ class hackathon():
         #controlnet:4 -> 13
         #unet: 3 + 13 -> 1
         #总共：4 +13 +3+1=21
-        self.model.control_out = []
-
-        self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 320, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 640, H//16, W //16, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 640, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//32, W //32, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
-        self.model.control_out.append(torch.randn(2, 1280, H//64, W //64, dtype=torch.float32).to("cuda"))
         
-        self.model.eps = torch.zeros(2, 4, 32, 48, dtype=torch.float32).to("cuda")
-        
-        self.model.decode_result = torch.zeros(1,3,256,384,dtype=torch.float32).to("cuda")
         """-----------------------------------------------"""
 
 
