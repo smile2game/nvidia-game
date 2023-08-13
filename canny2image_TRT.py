@@ -36,7 +36,7 @@ class hackathon():
             cond_stage_model = self.model.cond_stage_model
             clip = cond_stage_model.transformer #
 
-            input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int64
+            input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")  #需要特别注意这里的输入是int32
             dynamic_axes = {'input_ids' : {0 : 'bs'},
                             'context' : {0 : 'bs'},
                             'pooled_output' : {0 : 'bs'}}
@@ -61,34 +61,7 @@ class hackathon():
         clip_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
         clip_context = clip_engine.create_execution_context()
 
-        ##############################################################################################################
-        # clip_nIO = clip_engine.num_io_tensors
-        # clip_tensor_name = [clip_engine.get_tensor_name(i) for i in range(clip_nIO)]
-        # #创建流
-        # _, self.model.cond_stage_model.clip_stream = cudart.cudaStreamCreate()
-        # #buffer处理
-        # self.model.cond_stage_model.input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")
-        # print("定义的input",self.model.cond_stage_model.input_ids.data_ptr())
-        # self.model.cond_stage_model.context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
-        # self.model.cond_stage_model.pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
-        # buffer_clip = []
-        # buffer_clip.append(self.model.cond_stage_model.input_ids.reshape(-1).data_ptr())
-        # buffer_clip.append(self.model.cond_stage_model.context.reshape(-1).data_ptr())
-        # buffer_clip.append(self.model.cond_stage_model.pooled_output.reshape(-1).data_ptr())
-        # #提前推断
-        # for i in range(clip_nIO):
-        #     clip_context.set_tensor_address(clip_tensor_name[i], buffer_clip[i])
-        # clip_context.execute_async_v3(self.model.cond_stage_model.clip_stream)
-
-        # #捕获
-        # cudart.cudaStreamBeginCapture(self.model.cond_stage_model.clip_stream, cudart.cudaStreamCaptureMode.cudaStreamCaptureModeGlobal)
-        # clip_context.execute_async_v3(self.model.cond_stage_model.clip_stream) #可以改
-        # _, graph = cudart.cudaStreamEndCapture(self.model.cond_stage_model.clip_stream)  #结束
-        # _, self.model.cond_stage_model.graphExe_clip = cudart.cudaGraphInstantiate(graph, 0) #实例化,这个直接调用
-        # #图推断测试
-        # cudart.cudaGraphLaunch(self.model.cond_stage_model.graphExe_clip, self.model.cond_stage_model.clip_stream)
-        # cudart.cudaStreamSynchronize(self.model.cond_stage_model.clip_stream)
-        ##############################################################################################################
+       
         self.model.cond_stage_model.clip_context = clip_context
         print("加载成功clip！！！")
         """---------------------------加载controlnet--------------------""" 
@@ -117,7 +90,7 @@ class hackathon():
             control_model = self.model.control_model 
             x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
             h_in = torch.randn(2, 3, H, W, dtype=torch.float32).to("cuda")
-            t_in = torch.zeros(2, dtype=torch.int64).to("cuda")
+            t_in = torch.zeros(2, dtype=torch.int32).to("cuda")  #难道是这里溢出了
             c_in = torch.randn(2, 77, 768, dtype=torch.float32).to("cuda")
 
             output_names = []
@@ -176,7 +149,7 @@ class hackathon():
             diffusion_model = self.model.model.diffusion_model #找对了
             print("转换diffusion_model为onnx模型")
             x_in = torch.randn(2, 4, H//8, W //8, dtype=torch.float32).to("cuda")
-            time_in = torch.zeros(2, dtype=torch.int64).to("cuda")
+            time_in = torch.zeros(2, dtype=torch.int32).to("cuda")
             context_in = torch.randn(2, 77, 768, dtype=torch.float32).to("cuda")
             control = []
             control.append(torch.randn(2, 320, H//8, W //8, dtype=torch.float32).to("cuda"))
@@ -244,8 +217,9 @@ class hackathon():
         _, graph = cudart.cudaStreamEndCapture(self.model.diffusion_stream)  #结束
         _, self.model.graphExe_diffusion = cudart.cudaGraphInstantiate(graph, 0) #实例化,这个直接调用
         #图推断测试
-        cudart.cudaGraphLaunch(self.model.graphExe_diffusion, self.model.diffusion_stream)
-        cudart.cudaStreamSynchronize(self.model.diffusion_stream)
+        for i in range(3):
+            cudart.cudaGraphLaunch(self.model.graphExe_diffusion, self.model.diffusion_stream)
+            cudart.cudaStreamSynchronize(self.model.diffusion_stream)
         self.model.diffusion_context = diffusion_context
         print("加载成功diffusion_model的engine")
         """----------------------------------------------------------------------------------------------"""
@@ -268,15 +242,15 @@ class hackathon():
                 dynamic_axes={'z': {0: 'B'}, 'dec': {0: 'B'}},
             )
             print("vae的onnx生成完成")
-            os.system("trtexec --onnx=./sd_vae.onnx --saveEngine=./sd_vae_fp16.engine --fp16 --useCudaGraph --optShapes=z:1x4x32x48 --builderOptimizationLevel=5")
-            
+            os.system("trtexec --onnx=./sd_vae.onnx --saveEngine=./sd_vae_fp16.engine  --useCudaGraph --fp16 --optShapes=z:1x4x32x48 --builderOptimizationLevel=5")           
+        
         with open("./sd_vae_fp16.engine", 'rb') as f:
             engine_str = f.read()
         vae_decode_engine = trt.Runtime(self.trt_logger).deserialize_cuda_engine(engine_str)
         vae_decode_context = vae_decode_engine.create_execution_context()
         vae_decode_context.set_binding_shape(0, (1, 4, 32,48)) 
         self.model.vae_decode_context = vae_decode_context
-        print("finished vae!")
+        print("加载成功，大功告成 vae!")
         """-----------------------------------------------"""
 
         """-------------------------提前开buffer----------------------"""
@@ -288,7 +262,6 @@ class hackathon():
         with torch.no_grad():
             img = resize_image(HWC3(input_image), image_resolution)
             H, W, C = img.shape
-
             detected_map = self.apply_canny(img, low_threshold, high_threshold)
             detected_map = HWC3(detected_map)
 
@@ -309,11 +282,11 @@ class hackathon():
 
             if config.save_memory:
                 self.model.low_vram_shift(is_diffusing=True)
-            ddim_steps = 10  #当小于6的时候，图像会发生质变
+            ddim_steps = 14 #当小于6的时候，图像会发生质变
             self.model.control_scales = [strength * (0.825 ** float(12 - i)) for i in range(13)] if guess_mode else ([strength] * 13)  # Magic number. IDK why. Perhaps because 0.825**12<0.01 but 0.826**12>0.01
             
             samples, intermediates = self.ddim_sampler.sample(ddim_steps, num_samples,
-                                                        shape, cond, verbose=False, eta=eta,
+                                                        shape, cond, verbose=True, eta=eta,
                                                         unconditional_guidance_scale=scale,
                                                         unconditional_conditioning=un_cond)
 
@@ -327,3 +300,44 @@ class hackathon():
 if __name__ == "__main__":
     h = hackathon()
     h.initialize()
+
+
+
+
+
+
+
+
+
+
+
+
+
+     ##########################################clip计算图####################################################################
+        # clip_nIO = clip_engine.num_io_tensors
+        # clip_tensor_name = [clip_engine.get_tensor_name(i) for i in range(clip_nIO)]
+        # #创建流
+        # _, self.model.cond_stage_model.clip_stream = cudart.cudaStreamCreate()
+        # #buffer处理
+        # self.model.cond_stage_model.input_ids = torch.zeros((1,77),dtype=torch.int32).to("cuda")
+        # print("定义的input",self.model.cond_stage_model.input_ids.data_ptr())
+        # self.model.cond_stage_model.context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
+        # self.model.cond_stage_model.pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
+        # buffer_clip = []
+        # buffer_clip.append(self.model.cond_stage_model.input_ids.reshape(-1).data_ptr())
+        # buffer_clip.append(self.model.cond_stage_model.context.reshape(-1).data_ptr())
+        # buffer_clip.append(self.model.cond_stage_model.pooled_output.reshape(-1).data_ptr())
+        # #提前推断
+        # for i in range(clip_nIO):
+        #     clip_context.set_tensor_address(clip_tensor_name[i], buffer_clip[i])
+        # clip_context.execute_async_v3(self.model.cond_stage_model.clip_stream)
+
+        # #捕获
+        # cudart.cudaStreamBeginCapture(self.model.cond_stage_model.clip_stream, cudart.cudaStreamCaptureMode.cudaStreamCaptureModeGlobal)
+        # clip_context.execute_async_v3(self.model.cond_stage_model.clip_stream) #可以改
+        # _, graph = cudart.cudaStreamEndCapture(self.model.cond_stage_model.clip_stream)  #结束
+        # _, self.model.cond_stage_model.graphExe_clip = cudart.cudaGraphInstantiate(graph, 0) #实例化,这个直接调用
+        # #图推断测试
+        # cudart.cudaGraphLaunch(self.model.cond_stage_model.graphExe_clip, self.model.cond_stage_model.clip_stream)
+        # cudart.cudaStreamSynchronize(self.model.cond_stage_model.clip_stream)
+        ##############################################################################################################

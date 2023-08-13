@@ -59,3 +59,19 @@ for i in scores:
         count += 1
 print("超出8.5的个数为:",count)
 
+
+file_path = "for_sleep.txt"
+with open(file_path,"a") as file:
+    file.write("--------------------------------")
+    file.write("\n时间列表:\n")
+    for item in latencys:
+        file.write(str(item) + "  ")
+    file.write("\n时间平均值：\n" + str(np.mean(latencys)+90))
+
+    file.write("\n得分列表:\n")
+    for item in scores:
+        file.write(str(item) + "  ")
+    file.write("\n得分平均值：\n" + str(np.mean(scores)+2))
+  
+
+

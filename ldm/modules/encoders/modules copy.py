@@ -127,20 +127,21 @@ class FrozenCLIPEmbedder(AbstractEncoder):
     def forward(self, text):
         batch_encoding = self.tokenizer(text, truncation=True, max_length=self.max_length, return_length=True,
                                         return_overflowing_tokens=False, padding="max_length", return_tensors="pt")
-        # tokens = batch_encoding["input_ids"].to(self.device).to(torch.int32)
         tokens = batch_encoding["input_ids"].to(self.device).to(torch.int32)
-        # context = self.transformer(input_ids=tokens, output_hidden_states=self.layer=="hidden")["last_hidden_state"]
         ################################## update: clip trt infer ########################################
         buffer_device_clip = [] #记录输入输出的地址指针   
         buffer_device_clip.append(tokens.reshape(-1).data_ptr())
-      
+        # start = datetime.datetime.now().timestamp()
         context = torch.zeros(1,77,768, dtype=torch.float32).to("cuda")
         pooled_output = torch.zeros(1,768,dtype=torch.float32).to("cuda")
-
+        # end = datetime.datetime.now().timestamp()
+        # print("\n拷贝数据消耗时间为：", (end - start)*1000 )
         buffer_device_clip.append(context.reshape(-1).data_ptr())
         buffer_device_clip.append(pooled_output.reshape(-1).data_ptr())
-
+        # start = datetime.datetime.now().timestamp()
         self.clip_context.execute_v2(buffer_device_clip)   #这里是真的有大问题
+        # end = datetime.datetime.now().timestamp()
+        # print("\nclip消耗时间为：", (end - start)*1000 )
         #######################################################################################################
         return context
 

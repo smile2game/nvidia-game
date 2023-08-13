@@ -3,8 +3,8 @@ import torch
 import torch as th
 import torch.nn as nn
 from cuda import cudart
-from cuda import cudart
-import datetime
+# from cuda import cudart
+# import datetime
 # import os
 # os.environ['CUDA_MODULE_LOADING'] = 'LAZY'  #不要用，效果不好
 
@@ -308,7 +308,6 @@ class ControlNet(nn.Module):
 
         h = self.middle_block(h, emb, context)
         outs.append(self.middle_block_out(h, emb, context))
-
         return outs
 
 
